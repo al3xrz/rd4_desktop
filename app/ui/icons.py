@@ -1,0 +1,194 @@
+from __future__ import annotations
+
+from app.ui.qt import QApplication, QBrush, QColor, QIcon, QPainter, QPen, QPixmap, Qt, QStyle
+
+
+def standard_icon(pixmap: int):
+    return QApplication.style().standardIcon(pixmap)
+
+
+def set_button_icon(button, pixmap: int) -> None:
+    button.setIcon(icon_for(pixmap))
+
+
+def icon_for(pixmap: int):
+    if pixmap == ICON_NEW:
+        return _plus_icon()
+    if pixmap == ICON_EDIT:
+        return _pencil_icon()
+    if pixmap == ICON_FOLDER:
+        return _folder_icon()
+    if pixmap == ICON_SERVICE:
+        return _service_icon()
+    if pixmap == ICON_USERS:
+        return _users_icon()
+    if pixmap == ICON_REPORTS:
+        return _reports_icon()
+    if pixmap == ICON_EXIT:
+        return _exit_icon()
+    if pixmap == ICON_PASSWORD:
+        return _key_icon()
+    if pixmap == ICON_CONTRACT:
+        return _contract_icon()
+    return standard_icon(pixmap)
+
+
+def _plus_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setBrush(QBrush(QColor("#2e9d45")))
+    painter.setPen(QPen(QColor("#1f7a33"), 1))
+    painter.drawEllipse(3, 3, 18, 18)
+    painter.setPen(QPen(QColor("#ffffff"), 3))
+    painter.drawLine(12, 7, 12, 17)
+    painter.drawLine(7, 12, 17, 12)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _pencil_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#5c4630"), 3))
+    painter.drawLine(7, 17, 17, 7)
+    painter.setPen(QPen(QColor("#f2c94c"), 5))
+    painter.drawLine(6, 18, 16, 8)
+    painter.setPen(QPen(QColor("#2f80ed"), 3))
+    painter.drawLine(15, 7, 18, 10)
+    painter.setPen(QPen(QColor("#5c4630"), 2))
+    painter.drawLine(5, 19, 8, 18)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _folder_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#b88718"), 1))
+    painter.setBrush(QBrush(QColor("#f2c14e")))
+    painter.drawRoundedRect(3, 7, 18, 13, 2, 2)
+    painter.setBrush(QBrush(QColor("#ffd66b")))
+    painter.drawRoundedRect(3, 5, 8, 5, 2, 2)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _service_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#2f80ed"), 1))
+    painter.setBrush(QBrush(QColor("#d8e9ff")))
+    painter.drawRoundedRect(5, 3, 14, 18, 2, 2)
+    painter.setPen(QPen(QColor("#2f80ed"), 2))
+    painter.drawLine(8, 9, 16, 9)
+    painter.drawLine(8, 13, 16, 13)
+    painter.drawLine(8, 17, 13, 17)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _users_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#2f80ed"), 1))
+    painter.setBrush(QBrush(QColor("#d8e9ff")))
+    painter.drawEllipse(9, 4, 6, 6)
+    painter.drawRoundedRect(6, 12, 12, 8, 4, 4)
+    painter.setBrush(QBrush(QColor("#e8f1ff")))
+    painter.drawEllipse(4, 8, 5, 5)
+    painter.drawEllipse(15, 8, 5, 5)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _reports_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#6f42c1"), 1))
+    painter.setBrush(QBrush(QColor("#eee3ff")))
+    painter.drawRoundedRect(5, 3, 14, 18, 2, 2)
+    painter.setBrush(QBrush(QColor("#6f42c1")))
+    painter.drawRect(8, 15, 2, 3)
+    painter.drawRect(11, 11, 2, 7)
+    painter.drawRect(14, 8, 2, 10)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _exit_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#b00020"), 2))
+    painter.drawLine(6, 5, 6, 19)
+    painter.drawLine(6, 5, 14, 5)
+    painter.drawLine(6, 19, 14, 19)
+    painter.drawLine(12, 12, 20, 12)
+    painter.drawLine(17, 9, 20, 12)
+    painter.drawLine(17, 15, 20, 12)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _key_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#b88718"), 2))
+    painter.drawEllipse(4, 8, 7, 7)
+    painter.drawLine(11, 12, 20, 12)
+    painter.drawLine(17, 12, 17, 15)
+    painter.drawLine(20, 12, 20, 15)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _contract_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#2f80ed"), 1))
+    painter.setBrush(QBrush(QColor("#ffffff")))
+    painter.drawRoundedRect(5, 3, 14, 18, 2, 2)
+    painter.setPen(QPen(QColor("#2f80ed"), 2))
+    painter.drawLine(8, 8, 16, 8)
+    painter.drawLine(8, 12, 16, 12)
+    painter.drawLine(8, 16, 13, 16)
+    painter.end()
+    return QIcon(pixmap)
+
+
+ICON_BACK = QStyle.SP_ArrowBack
+ICON_CONTRACT = -8
+ICON_DELETE = QStyle.SP_TrashIcon
+ICON_EDIT = -2
+ICON_EXIT = -7
+ICON_FOLDER = -3
+ICON_NEW = QStyle.SP_FileIcon
+ICON_OPEN = QStyle.SP_DialogOpenButton
+ICON_PASSWORD = -9
+ICON_PRINT = QStyle.SP_DialogSaveButton
+ICON_REFRESH = QStyle.SP_BrowserReload
+ICON_REPORTS = -6
+ICON_SERVICE = -4
+ICON_SETTINGS = QStyle.SP_FileDialogListView
+ICON_USERS = -5

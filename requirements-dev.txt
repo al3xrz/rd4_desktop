@@ -1,0 +1,10 @@
+# Development dependencies for the current workspace.
+# This environment may be newer than the target Windows/Python 3.8 runtime.
+
+SQLAlchemy>=1.4,<2.1
+alembic>=1.8
+docxtpl>=0.16
+python-docx>=0.8.11
+openpyxl>=3.0
+pyinstaller>=6
+pytest>=7
