@@ -57,6 +57,10 @@ class DocxService:
         context = build_act_ticket_context(act)
         return self._render_template("ticket_2up_compact.docx", context, f"act_ticket_{act.number}.docx")
 
+    def render_act(self, act_id: int) -> Path:
+        act = self.act_service.get_act(act_id)
+        return self._render_act_document(act)
+
     def open_document(self, path: Path) -> None:
         if sys.platform.startswith("win"):
             os.startfile(path)  # type: ignore[attr-defined]
@@ -83,6 +87,51 @@ class DocxService:
         doc = DocxTemplate(str(template_path))
         doc.render(context)
         doc.save(str(output_path))
+        return output_path
+
+    def _render_act_document(self, act: Any) -> Path:
+        try:
+            from docx import Document
+        except ImportError as exc:
+            raise BusinessRuleError("Для печати DOCX установите зависимость python-docx.") from exc
+
+        output_dir = Path(tempfile.gettempdir()) / "rd4"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / _safe_filename(f"act_{act.number}.docx")
+
+        rows = [row for row in act.services if not row.deleted]
+        total = Decimal("0")
+        document = Document()
+        document.add_heading(f"Акт N {act.number}", level=1)
+        document.add_paragraph(f"Дата: {date_ru(act.date)}")
+
+        contract = act.contract
+        if contract is not None:
+            document.add_paragraph(f"Договор: {contract.contract_number} от {date_ru(contract.contract_date)}")
+            document.add_paragraph(f"Пациент: {contract.patient_name}")
+
+        table = document.add_table(rows=1, cols=6)
+        table.style = "Table Grid"
+        header_cells = table.rows[0].cells
+        for index, title in enumerate(["Код", "Услуга", "Ед.", "Цена", "Кол-во", "Сумма"]):
+            header_cells[index].text = title
+
+        for row in rows:
+            line_total = row.price * row.count * (Decimal("1") - row.discount / Decimal("100"))
+            total += line_total
+            cells = table.add_row().cells
+            cells[0].text = row.current_code or ""
+            cells[1].text = row.current_name
+            cells[2].text = row.unit
+            cells[3].text = money_ru(row.price)
+            cells[4].text = str(row.count)
+            cells[5].text = money_ru(line_total)
+
+        document.add_paragraph(f"Итого: {money_ru(total)} руб.")
+        if act.comments:
+            document.add_paragraph(f"Комментарий: {act.comments}")
+
+        document.save(str(output_path))
         return output_path
 
 

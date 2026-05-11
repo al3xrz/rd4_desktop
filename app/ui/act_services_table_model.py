@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from app.models import ActMedService
 from app.ui.qt import QAbstractTableModel, QModelIndex, Qt
 
@@ -25,16 +27,19 @@ class ActServicesTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.DisplayRole:
             return None
         row = self.rows[index.row()]
-        total = row.price * row.count * (1 - row.discount / 100)
+        price = self._value(row, "price", Decimal("0"))
+        count = self._value(row, "count", 0)
+        discount = self._value(row, "discount", Decimal("0"))
+        total = price * count * (1 - discount / 100)
         values = [
-            row.current_code or "",
-            row.current_name,
-            row.unit,
-            str(row.price),
-            str(row.count),
-            str(row.discount),
+            self._value(row, "current_code", "") or "",
+            self._value(row, "current_name", ""),
+            self._value(row, "unit", ""),
+            str(price),
+            str(count),
+            str(discount),
             str(total),
-            row.comments or "",
+            self._value(row, "comments", "") or "",
         ]
         return values[index.column()]
 
@@ -54,3 +59,8 @@ class ActServicesTableModel(QAbstractTableModel):
         self.beginResetModel()
         self.rows = rows
         self.endResetModel()
+
+    def _value(self, row: ActMedService | dict, name: str, default=None):
+        if isinstance(row, dict):
+            return row.get(name, default)
+        return getattr(row, name, default)

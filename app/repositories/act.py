@@ -21,4 +21,6 @@ class ActRepository(BaseRepository[Act]):
         return self.session.execute(stmt).scalar_one_or_none()
 
     def list_for_contract(self, contract_id: int, include_deleted: bool = False) -> list[Act]:
-        return self.list(contract_id=contract_id, include_deleted=include_deleted, limit=None)
+        stmt = select(Act).options(selectinload(Act.services)).where(Act.contract_id == contract_id)
+        stmt = self._exclude_deleted(stmt, include_deleted)
+        return list(self.session.execute(stmt).scalars().all())

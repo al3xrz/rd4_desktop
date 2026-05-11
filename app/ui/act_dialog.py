@@ -55,6 +55,7 @@ class ActDialog(QDialog):
         self.rows_table.setSelectionBehavior(QTableView.SelectRows)
         self.rows_table.setSelectionMode(QTableView.SingleSelection)
         self.rows_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.rows_table.doubleClicked.connect(lambda *args: self._edit_service())
 
         self.add_service_button = QPushButton("Добавить услугу")
         self.edit_service_button = QPushButton("Изменить строку")
@@ -117,15 +118,18 @@ class ActDialog(QDialog):
         if picker.exec_() != MedServicePickerDialog.Accepted or picker.selected_service_id is None:
             return
 
-        row_dialog = ActServiceRowDialog()
+        row_dialog = ActServiceRowDialog(service=picker.selected_service)
         if row_dialog.exec_() != ActServiceRowDialog.Accepted:
             return
         data = row_dialog.data()
 
         if self.act is None:
             data["med_service_id"] = picker.selected_service_id
+            data["current_code"] = picker.selected_service.get("code", "") if picker.selected_service else ""
+            data["current_name"] = picker.selected_service.get("name", "") if picker.selected_service else ""
+            data["unit"] = picker.selected_service.get("unit", "") if picker.selected_service else ""
             self.pending_services.append(data)
-            self._update_pending_label()
+            self._refresh_pending_rows()
             return
 
         try:
@@ -143,6 +147,10 @@ class ActDialog(QDialog):
         dialog = ActServiceRowDialog(row)
         if dialog.exec_() != ActServiceRowDialog.Accepted:
             return
+        if self.act is None:
+            row.update(dialog.data())
+            self._refresh_pending_rows()
+            return
         try:
             self.act_service.update_service_row(row.id, dialog.data(), self.current_user)
         except DomainError as exc:
@@ -154,6 +162,12 @@ class ActDialog(QDialog):
         row = self._selected_row()
         if row is None:
             QMessageBox.warning(self, "Роддом №4", "Выберите строку услуги")
+            return
+        if self.act is None:
+            index = self._selected_row_index()
+            if index is not None:
+                self.pending_services.pop(index)
+                self._refresh_pending_rows()
             return
         try:
             self.act_service.remove_service_row(row.id, self.current_user)
@@ -168,6 +182,12 @@ class ActDialog(QDialog):
             return None
         return self.rows_model.row_at(indexes[0].row())
 
+    def _selected_row_index(self) -> int | None:
+        indexes = self.rows_table.selectionModel().selectedRows()
+        if not indexes:
+            return None
+        return indexes[0].row()
+
     def _to_datetime(self, widget: QDateTimeEdit) -> datetime:
         qt_value = widget.dateTime()
         converter = getattr(qt_value, "toPyDateTime", None) or getattr(qt_value, "toPython")
@@ -181,3 +201,7 @@ class ActDialog(QDialog):
             self.pending_label.setText(f"Добавлено услуг: {len(self.pending_services)}")
         else:
             self.pending_label.clear()
+
+    def _refresh_pending_rows(self) -> None:
+        self.rows_model.set_rows(self.pending_services)
+        self._update_pending_label()

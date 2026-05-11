@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from decimal import Decimal
 
 from app.models import Contract
@@ -19,7 +19,6 @@ from app.ui.qt import (
     QLineEdit,
     QMessageBox,
     QScrollArea,
-    QTabWidget,
     QTextEdit,
     Qt,
     QVBoxLayout,
@@ -104,7 +103,9 @@ class ContractDialog(QDialog):
         self.patient_phone.setPlaceholderText("+7...")
         self.patient_passport_issued_by.setPlaceholderText("Кем выдан паспорт")
         self.patient_passport_issued_code.setPlaceholderText("000-000")
+        self.patient_passport_issued_code.setInputMask("000-000;_")
         self.patient_passport_series.setPlaceholderText("0000 000000")
+        self.patient_passport_series.setInputMask("0000 000000;_")
 
         self.delegate_name.setPlaceholderText("Фамилия Имя Отчество")
         self.delegate_reg_address.setPlaceholderText("Адрес по регистрации")
@@ -112,7 +113,9 @@ class ContractDialog(QDialog):
         self.delegate_phone.setPlaceholderText("+7...")
         self.delegate_passport_issued_by.setPlaceholderText("Кем выдан паспорт")
         self.delegate_passport_issued_code.setPlaceholderText("000-000")
+        self.delegate_passport_issued_code.setInputMask("000-000;_")
         self.delegate_passport_series.setPlaceholderText("0000 000000")
+        self.delegate_passport_series.setInputMask("0000 000000;_")
 
         self.service_insurance_number.setPlaceholderText("Номер полиса/страхового случая")
         self.comments.setPlaceholderText("Внутренний комментарий к договору")
@@ -122,12 +125,7 @@ class ContractDialog(QDialog):
             input_widget.setMinimumWidth(240)
 
     def _build_layout(self) -> None:
-        self.tabs = QTabWidget()
-        self.tabs.addTab(self._scrollable(self._build_contract_tab()), "Договор")
-        self.tabs.addTab(self._scrollable(self._build_patient_tab()), "Пациент")
-        self.tabs.addTab(self._scrollable(self._build_delegate_tab()), "Представитель")
-        self.tabs.addTab(self._scrollable(self._build_payment_tab()), "Услуги и оплата")
-        self.tabs.addTab(self._scrollable(self._build_discharge_tab()), "Выписка")
+        self.form = self._scrollable(self._build_contract_form())
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         self.buttons.button(QDialogButtonBox.Save).setText("Сохранить")
@@ -138,15 +136,27 @@ class ContractDialog(QDialog):
         layout = QVBoxLayout()
         title = QLabel("Договор")
         title.setStyleSheet("font-size: 20px; font-weight: 600;")
-        subtitle = QLabel("Заполните основные данные по вкладкам. Обязательные поля проверяются при сохранении.")
+        subtitle = QLabel("Заполните параметры договора в сгруппированных блоках. Обязательные поля проверяются при сохранении.")
         subtitle.setStyleSheet("color: #666;")
         layout.addWidget(title)
         layout.addWidget(subtitle)
-        layout.addWidget(self.tabs)
+        layout.addWidget(self.form)
         layout.addWidget(self.buttons)
         self.setLayout(layout)
 
-    def _build_contract_tab(self) -> QWidget:
+    def _build_contract_form(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self._build_contract_section())
+        layout.addWidget(self._build_patient_section())
+        layout.addWidget(self._build_delegate_section())
+        layout.addWidget(self._build_payment_section())
+        layout.addWidget(self._build_discharge_section())
+        layout.addStretch()
+        page.setLayout(layout)
+        return page
+
+    def _build_contract_section(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(
@@ -160,11 +170,10 @@ class ContractDialog(QDialog):
                 ],
             )
         )
-        layout.addStretch()
         page.setLayout(layout)
         return page
 
-    def _build_patient_tab(self) -> QWidget:
+    def _build_patient_section(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(
@@ -197,11 +206,10 @@ class ContractDialog(QDialog):
                 ],
             )
         )
-        layout.addStretch()
         page.setLayout(layout)
         return page
 
-    def _build_delegate_tab(self) -> QWidget:
+    def _build_delegate_section(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(self.delegate_enabled)
@@ -235,11 +243,10 @@ class ContractDialog(QDialog):
                 ],
             )
         )
-        layout.addStretch()
         page.setLayout(layout)
         return page
 
-    def _build_payment_tab(self) -> QWidget:
+    def _build_payment_section(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout()
         service_type = QHBoxLayout()
@@ -278,11 +285,10 @@ class ContractDialog(QDialog):
             note = QLabel("Предоплата редактируется через платежи после создания договора.")
             note.setStyleSheet("color: #666;")
             layout.addWidget(note)
-        layout.addStretch()
         page.setLayout(layout)
         return page
 
-    def _build_discharge_tab(self) -> QWidget:
+    def _build_discharge_section(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(
@@ -295,7 +301,6 @@ class ContractDialog(QDialog):
                 ],
             )
         )
-        layout.addStretch()
         page.setLayout(layout)
         return page
 
@@ -406,7 +411,9 @@ class ContractDialog(QDialog):
     def _date_time_edit(self) -> QDateTimeEdit:
         widget = QDateTimeEdit()
         widget.setCalendarPopup(True)
-        widget.setDateTime(QDateTime.currentDateTime())
+        widget.setDisplayFormat("dd.MM.yyyy")
+        today = datetime.combine(datetime.now().date(), time.min, tzinfo=timezone.utc)
+        widget.setDateTime(QDateTime(today))
         return widget
 
     def _money_input(self) -> QDoubleSpinBox:
@@ -435,17 +442,15 @@ class ContractDialog(QDialog):
         return scroll
 
     def _to_datetime(self, widget: QDateTimeEdit) -> datetime:
-        qt_value = widget.dateTime()
-        converter = getattr(qt_value, "toPyDateTime", None) or getattr(qt_value, "toPython")
-        value = converter()
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value
+        qt_value = widget.date()
+        converter = getattr(qt_value, "toPyDate", None) or getattr(qt_value, "toPython")
+        return datetime.combine(converter(), time.min, tzinfo=timezone.utc)
 
     def _set_datetime(self, widget: QDateTimeEdit, value: datetime | None) -> None:
         if value is None:
             return
-        widget.setDateTime(QDateTime(value))
+        normalized = datetime.combine(value.date(), time.min, tzinfo=value.tzinfo or timezone.utc)
+        widget.setDateTime(QDateTime(normalized))
 
     def _optional_text(self, widget: QLineEdit) -> str | None:
         return widget.text().strip() or None
@@ -511,7 +516,6 @@ class ContractDialog(QDialog):
     def _save(self) -> None:
         if self.service_insurance.isChecked() and not self._optional_text(self.service_insurance_number):
             QMessageBox.warning(self, "Роддом №4", "Укажите номер полиса/страхового случая")
-            self.tabs.setCurrentIndex(3)
             self.service_insurance_number.setFocus()
             return
         self.accept()

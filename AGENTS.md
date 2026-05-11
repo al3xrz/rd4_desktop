@@ -33,6 +33,8 @@ models -> services
 services -> ui
 ```
 
+Keep `ARCHITECTURE.md` in the repository root up to date when changing application structure, dependency direction, startup flow, database/migration rules, packaging, or major UI/service/model flows.
+
 ## Transaction rules
 
 One business operation equals one service-level transaction.
@@ -81,4 +83,3 @@ RD4_DATA_DIR=.rd4_bundle_smoke dist/RD4/RD4
 - Do not hard-delete business rows unless explicitly requested.
 - Use soft-delete fields for contracts, payments, acts, act service rows, and med services.
 - Keep Windows 7/Python 3.8 compatibility in mind before changing dependencies.
-
