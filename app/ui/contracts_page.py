@@ -31,9 +31,8 @@ class ContractsPage(QWidget):
     """Main contract registry page.
 
     The page keeps all active contracts in memory and applies lightweight client-side
-    filters for the current workload. Expensive balance calculations are deliberately
-    limited to the selected contract, so a large registry can still be searched and
-    sorted quickly.
+    filters for the current workload. Balance calculations are limited to the
+    visible rows so the registry can still be searched and sorted predictably.
     """
 
     PERIOD_LAST_3_MONTHS = "Последние 3 месяца"
@@ -169,7 +168,8 @@ class ContractsPage(QWidget):
             and (not query or query in self._contract_text(contract))
         ]
 
-        self.model.set_contracts(contracts, {})
+        summaries = self._contract_summaries(contracts)
+        self.model.set_contracts(contracts, summaries)
         self._restore_focus()
         self.summary_label.setText(
             f"Показано: {len(contracts)} из {len(self.contracts)}" if query else f"Всего договоров: {len(contracts)}"
@@ -188,6 +188,15 @@ class ContractsPage(QWidget):
                 contract.comments or "",
             ]
         ).lower()
+
+    def _contract_summaries(self, contracts: list[Contract]) -> dict[int, dict]:
+        summaries = {}
+        for contract in contracts:
+            try:
+                summaries[contract.id] = self.contract_service.get_contract_summary(contract.id)
+            except DomainError:
+                summaries[contract.id] = {}
+        return summaries
 
     def _selected_contract(self) -> Contract | None:
         """Return the selected contract, mapping the sorted proxy row to source data."""

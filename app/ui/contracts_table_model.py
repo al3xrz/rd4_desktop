@@ -7,8 +7,8 @@ from app.ui.qt import QAbstractTableModel, QModelIndex, Qt
 class ContractsTableModel(QAbstractTableModel):
     """Qt table model for the contracts registry.
 
-    The model exposes only cheap contract fields. Financial totals are not
-    calculated per row here because that would make large registries sluggish.
+    The model displays cheap contract fields plus precomputed summaries passed
+    in by the page.
     """
 
     HEADERS = [
@@ -20,6 +20,7 @@ class ContractsTableModel(QAbstractTableModel):
         "Категория",
         "Телефон",
         "Тип оплаты",
+        "Баланс",
     ]
 
     def __init__(self, contracts: list[Contract] | None = None, summaries: dict[int, dict] | None = None) -> None:
@@ -58,6 +59,7 @@ class ContractsTableModel(QAbstractTableModel):
             contract.category or "",
             contract.patient_phone or "",
             self._payment_type(contract),
+            self._balance_text(contract),
         ]
         return values[index.column()]
 
@@ -111,8 +113,25 @@ class ContractsTableModel(QAbstractTableModel):
             contract.category or "",
             contract.patient_phone or "",
             self._payment_type(contract),
+            self._balance_sort_value(contract),
         ]
         value = values[column]
         if hasattr(value, "timestamp"):
             return value.timestamp()
+        if isinstance(value, (int, float)):
+            return value
         return str(value or "").lower()
+
+    def _balance_text(self, contract: Contract) -> str:
+        summary = self.summaries.get(contract.id, {})
+        balance = summary.get("balance")
+        if balance is None:
+            return ""
+        return str(balance)
+
+    def _balance_sort_value(self, contract: Contract):
+        summary = self.summaries.get(contract.id, {})
+        balance = summary.get("balance")
+        if balance is None:
+            return 0
+        return float(balance)
