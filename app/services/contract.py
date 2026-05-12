@@ -74,6 +74,10 @@ class ContractService:
         with session_scope() as session:
             return ContractRepository(session).list(limit=None, **(filters or {}))
 
+    def list_contract_summaries(self) -> dict[int, dict]:
+        with session_scope() as session:
+            return ContractRepository(session).list_summaries()
+
     def get_contract_summary(self, contract_id: int) -> dict:
         with session_scope() as session:
             contract = ContractRepository(session).get_with_details(contract_id)

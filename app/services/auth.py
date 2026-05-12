@@ -23,6 +23,11 @@ class AuthService:
                 raise PermissionDeniedError("Invalid username or password.")
             return user
 
+    def list_login_users(self) -> list[User]:
+        """Return active users shown on the login form."""
+        with session_scope() as session:
+            return UserRepository(session).list_active()
+
     def create_user(self, data: dict, current_user: User | None = None) -> User:
         """Create a user account, hashing the plain password before persistence."""
         self._require_admin(current_user)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.services import AuthService
 from app.services.exceptions import DomainError
 from app.ui.icons import ICON_OPEN, set_button_icon
-from app.ui.qt import QCheckBox, QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, Signal
+from app.ui.qt import QCheckBox, QComboBox, QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, Signal
 
 
 class LoginWindow(QDialog):
@@ -15,8 +15,10 @@ class LoginWindow(QDialog):
         self.setWindowTitle("Роддом №4")
         self.setMinimumWidth(360)
 
-        self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Логин")
+        self.username_input = QComboBox()
+        self.username_input.setEditable(True)
+        self.username_input.lineEdit().setPlaceholderText("Пользователь")
+        self._load_users()
 
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Пароль")
@@ -42,13 +44,28 @@ class LoginWindow(QDialog):
         layout.addWidget(self.login_button)
         self.setLayout(layout)
 
+    def _load_users(self) -> None:
+        try:
+            users = self.auth_service.list_login_users()
+        except DomainError:
+            users = []
+        for user in users:
+            label = user.name or user.username
+            if label != user.username:
+                label = f"{label} ({user.username})"
+            self.username_input.addItem(label, user.username)
+
     def _toggle_password_visibility(self, checked: bool) -> None:
         echo_mode = QLineEdit.Normal if checked else QLineEdit.Password
         self.password_input.setEchoMode(echo_mode)
 
     def _login(self) -> None:
         self.error_label.clear()
-        username = self.username_input.text().strip()
+        username = self.username_input.currentText().strip()
+        current_index = self.username_input.currentIndex()
+        if current_index >= 0 and username == self.username_input.itemText(current_index):
+            username = self.username_input.itemData(current_index) or username
+        username = username.strip()
         password = self.password_input.text()
 
         try:

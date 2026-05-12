@@ -1,4 +1,5 @@
 .venv/
+.uv/
 .uv-python/
 .rd4/
 .rd4_*/

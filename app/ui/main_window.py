@@ -37,6 +37,7 @@ class MainWindow(QMainWindow):
         self.current_user = current_user
         self.contracts_page_index = 0
         self.last_contract_id: int | None = None
+        self.details_page: QWidget | None = None
         self.page_indexes: dict[str, int] = {}
         self.setWindowTitle("Роддом №4")
         self.resize(1100, 720)
@@ -129,31 +130,35 @@ class MainWindow(QMainWindow):
 
     def open_contract_details(self, contract_id: int) -> None:
         self.last_contract_id = contract_id
+        self._remove_details_page()
         details_page = ContractDetailsPage(
             contract_id,
             self.current_user,
-            on_back=lambda: self.show_contracts_page(contract_id),
+            on_back=lambda: self.close_contract_details(contract_id),
         )
-        old_page = self.pages.widget(self.contracts_page_index)
-        self.pages.removeWidget(old_page)
-        old_page.deleteLater()
-        self.pages.insertWidget(self.contracts_page_index, details_page)
-        self.pages.setCurrentIndex(self.contracts_page_index)
+        self.details_page = details_page
+        self.pages.addWidget(details_page)
+        self.pages.setCurrentWidget(details_page)
+
+    def close_contract_details(self, focus_contract_id: int | None = None) -> None:
+        if focus_contract_id is not None:
+            self.contracts_page.last_focused_contract_id = focus_contract_id
+        self.contracts_page.reload()
+        self.show_contracts_page(focus_contract_id)
+        self._remove_details_page()
 
     def show_contracts_page(self, focus_contract_id: int | None = None) -> None:
         if focus_contract_id is not None:
             self.last_contract_id = focus_contract_id
-        if self.pages.widget(self.contracts_page_index) is self.contracts_page:
-            self.pages.setCurrentIndex(self.contracts_page_index)
-            self.contracts_page.focus_contract(self.last_contract_id)
-            return
-        old_page = self.pages.widget(self.contracts_page_index)
-        self.pages.removeWidget(old_page)
-        old_page.deleteLater()
-        self.contracts_page = ContractsPage(self.current_user, on_open_contract=self.open_contract_details)
-        self.pages.insertWidget(self.contracts_page_index, self.contracts_page)
+        self.pages.setCurrentWidget(self.contracts_page)
         self.contracts_page.focus_contract(self.last_contract_id)
-        self.pages.setCurrentIndex(self.contracts_page_index)
+
+    def _remove_details_page(self) -> None:
+        if self.details_page is None:
+            return
+        self.pages.removeWidget(self.details_page)
+        self.details_page.deleteLater()
+        self.details_page = None
 
     def _has_role(self, role: str) -> bool:
         current_role = getattr(self.current_user.role, "value", self.current_user.role)

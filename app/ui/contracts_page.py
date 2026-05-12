@@ -47,6 +47,7 @@ class ContractsPage(QWidget):
         self.contract_service = contract_service or ContractService()
         self.on_open_contract = on_open_contract
         self.contracts: list[Contract] = []
+        self.summaries: dict[int, dict] = {}
         self.model = ContractsTableModel()
         self.proxy_model = QSortFilterProxyModel()
         self.proxy_model.setSourceModel(self.model)
@@ -155,6 +156,7 @@ class ContractsPage(QWidget):
     def reload(self) -> None:
         """Reload active contracts from the service and re-apply UI filters."""
         self.contracts = self.contract_service.list_contracts()
+        self.summaries = self.contract_service.list_contract_summaries()
         self._apply_filter()
 
     def _apply_filter(self) -> None:
@@ -168,8 +170,7 @@ class ContractsPage(QWidget):
             and (not query or query in self._contract_text(contract))
         ]
 
-        summaries = self._contract_summaries(contracts)
-        self.model.set_contracts(contracts, summaries)
+        self.model.set_contracts(contracts, self.summaries)
         self._restore_focus()
         self.summary_label.setText(
             f"Показано: {len(contracts)} из {len(self.contracts)}" if query else f"Всего договоров: {len(contracts)}"
@@ -188,15 +189,6 @@ class ContractsPage(QWidget):
                 contract.comments or "",
             ]
         ).lower()
-
-    def _contract_summaries(self, contracts: list[Contract]) -> dict[int, dict]:
-        summaries = {}
-        for contract in contracts:
-            try:
-                summaries[contract.id] = self.contract_service.get_contract_summary(contract.id)
-            except DomainError:
-                summaries[contract.id] = {}
-        return summaries
 
     def _selected_contract(self) -> Contract | None:
         """Return the selected contract, mapping the sorted proxy row to source data."""
@@ -342,11 +334,9 @@ class ContractsPage(QWidget):
             f"{contract.contract_number} | {contract.patient_name} | тел.: {contract.patient_phone or '-'} | "
             f"история родов: {contract.birth_history_number or '-'} | {self._payment_type(contract)}"
         )
-        try:
-            summary = self.contract_service.get_contract_summary(contract.id)
+        summary = self.summaries.get(contract.id)
+        if summary:
             detail += " | баланс: {balance} | статус: {status}".format(**summary)
-        except DomainError:
-            pass
         self.details_label.setText(detail)
 
     def focus_contract(self, contract_id: int | None) -> None:

@@ -3,7 +3,9 @@
 from pathlib import Path
 
 
-ROOT = Path(SPECPATH).parent
+SPEC_PATH = Path(SPECPATH).resolve()
+SPEC_DIR = SPEC_PATH.parent if SPEC_PATH.suffix == ".spec" else SPEC_PATH
+ROOT = SPEC_DIR.parent
 
 datas = [
     (str(ROOT / "alembic.ini"), "."),

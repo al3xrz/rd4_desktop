@@ -94,6 +94,7 @@ def test_services_full_smoke_scenario(tmp_path, monkeypatch):
     summary = contracts.get_contract_summary(contract.id)
     assert summary["refunds_total"] == Decimal("-10.00")
     assert summary["balance"] == Decimal("-60.00")
+    assert contracts.list_contract_summaries()[contract.id]["balance"] == summary["balance"]
 
     act_with_service = acts.list_acts(contract.id)[0]
     assert act_with_service.number == act.number

@@ -15,3 +15,8 @@ class UserRepository(BaseRepository[User]):
         """Find a user by login name for authentication and uniqueness checks."""
         stmt = select(User).where(User.username == username)
         return self.session.execute(stmt).scalar_one_or_none()
+
+    def list_active(self) -> list[User]:
+        """Return active users for login selection."""
+        stmt = select(User).where(User.is_active.is_(True)).order_by(User.name, User.username)
+        return list(self.session.execute(stmt).scalars().all())
