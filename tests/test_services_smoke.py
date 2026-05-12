@@ -128,6 +128,48 @@ def test_services_enforce_business_rules(tmp_path, monkeypatch):
         )
 
 
+def test_contract_soft_delete_cascades_to_payments_and_acts(tmp_path, monkeypatch):
+    configure_temp_database(tmp_path, monkeypatch)
+
+    from app.core.database import session_scope
+    from app.models import Act, ActMedService, Contract, Payment, Role
+    from app.services import ActService, AuthService, ContractService, MedServiceService, PaymentService
+
+    now = datetime.now(timezone.utc)
+    admin = AuthService().create_user({"username": "admin", "password": "secret", "role": Role.ADMIN})
+    contracts = ContractService()
+    contract = contracts.create_contract(contract_payload(now), admin)
+    folder = MedServiceService().create_folder({"name": "Root"})
+    service = MedServiceService().create_service(
+        {
+            "parent_id": folder.id,
+            "code": "A01",
+            "name": "Consultation",
+            "unit": "шт",
+            "price": Decimal("100.00"),
+            "vat": 0,
+        }
+    )
+    act = ActService().create_act(
+        contract.id,
+        {"number": "A-001", "date": now, "services": [{"med_service_id": service.id, "count": 1}]},
+        admin,
+    )
+    payment = PaymentService().create_payment(contract.id, {"date": now, "amount": Decimal("100.00")}, admin)
+
+    contracts.delete_contract(contract.id, admin)
+
+    assert contracts.list_contracts() == []
+    assert [item.id for item in contracts.list_contracts({"include_deleted": True})] == [contract.id]
+    with session_scope() as session:
+        assert session.get(Contract, contract.id).deleted is True
+        assert session.get(Act, act.id).deleted is True
+        assert session.get(Payment, payment.id).deleted is True
+        rows = session.query(ActMedService).filter_by(act_id=act.id).all()
+        assert rows
+        assert all(row.deleted for row in rows)
+
+
 def test_med_service_tree_rules(tmp_path, monkeypatch):
     configure_temp_database(tmp_path, monkeypatch)
 

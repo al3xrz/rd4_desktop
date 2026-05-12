@@ -60,8 +60,19 @@ class ContractService:
 
     def delete_contract(self, contract_id: int, current_user: User | None = None) -> None:
         with session_scope() as session:
-            if not ContractRepository(session).soft_delete(contract_id):
+            contract = ContractRepository(session).get_with_details(contract_id, include_deleted=True)
+            if contract is None:
                 raise NotFoundError(f"Contract not found: {contract_id}")
+            if contract.deleted:
+                return
+
+            contract.deleted = True
+            for payment in contract.payments:
+                payment.deleted = True
+            for act in contract.acts:
+                act.deleted = True
+                for row in act.services:
+                    row.deleted = True
 
     def get_contract(self, contract_id: int) -> Contract:
         with session_scope() as session:
@@ -74,9 +85,9 @@ class ContractService:
         with session_scope() as session:
             return ContractRepository(session).list(limit=None, **(filters or {}))
 
-    def list_contract_summaries(self) -> dict[int, dict]:
+    def list_contract_summaries(self, include_deleted: bool = False) -> dict[int, dict]:
         with session_scope() as session:
-            return ContractRepository(session).list_summaries()
+            return ContractRepository(session).list_summaries(include_deleted=include_deleted)
 
     def get_contract_summary(self, contract_id: int) -> dict:
         with session_scope() as session:

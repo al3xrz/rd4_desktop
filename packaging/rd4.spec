@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files
+
 
 SPEC_PATH = Path(SPECPATH).resolve()
 SPEC_DIR = SPEC_PATH.parent if SPEC_PATH.suffix == ".spec" else SPEC_PATH
@@ -14,6 +16,7 @@ datas = [
     (str(ROOT / "app" / "templates"), "app/templates"),
     (str(ROOT / "app" / "resources"), "app/resources"),
 ]
+datas += collect_data_files("qtawesome")
 
 python_binaries = []
 if sys.platform.startswith("win"):
@@ -46,6 +49,8 @@ a = Analysis(
         "docxtpl",
         "docx",
         "logging.config",
+        "qtawesome",
+        "qtpy",
     ],
     hookspath=[],
     hooksconfig={},

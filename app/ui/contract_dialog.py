@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from app.models import Contract
 from app.ui.qt import (
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDateTime,
@@ -13,11 +14,13 @@ from app.ui.qt import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QRadioButton,
     QScrollArea,
     QTextEdit,
     Qt,
@@ -63,21 +66,21 @@ class ContractDialog(QDialog):
         self.patient_name = QLineEdit()
         self.patient_birth_date = self._date_time_edit()
         self.birth_history_number = QLineEdit()
-        self.patient_reg_address = QLineEdit()
-        self.patient_live_address = QLineEdit()
+        self.patient_reg_address = QTextEdit()
+        self.patient_live_address = QTextEdit()
         self.patient_phone = QLineEdit()
-        self.patient_passport_issued_by = QLineEdit()
+        self.patient_passport_issued_by = QTextEdit()
         self.patient_passport_issued_code = QLineEdit()
         self.patient_passport_series = QLineEdit()
         self.patient_passport_date = self._date_time_edit()
 
-        self.delegate_enabled = QCheckBox("Договор оформляет представитель")
+        self.delegate_enabled = QCheckBox("Представитель")
         self.delegate_name = QLineEdit()
         self.delegate_birth_date = self._date_time_edit()
-        self.delegate_reg_address = QLineEdit()
-        self.delegate_live_address = QLineEdit()
+        self.delegate_reg_address = QTextEdit()
+        self.delegate_live_address = QTextEdit()
         self.delegate_phone = QLineEdit()
-        self.delegate_passport_issued_by = QLineEdit()
+        self.delegate_passport_issued_by = QTextEdit()
         self.delegate_passport_issued_code = QLineEdit()
         self.delegate_passport_series = QLineEdit()
         self.delegate_passport_date = self._date_time_edit()
@@ -86,8 +89,12 @@ class ContractDialog(QDialog):
         self.childbirth = QCheckBox("Роды")
         self.prepay_inpatient_treatment = self._money_input()
         self.prepay_childbirth = self._money_input()
-        self.service_payed = QCheckBox("Платная услуга")
-        self.service_insurance = QCheckBox("Страховая услуга")
+        self.service_payed = QRadioButton("Платная")
+        self.service_insurance = QRadioButton("ФОМС")
+        self.payment_type_group = QButtonGroup(self)
+        self.payment_type_group.addButton(self.service_payed)
+        self.payment_type_group.addButton(self.service_insurance)
+        self.service_payed.setChecked(True)
         self.service_insurance_number = QLineEdit()
 
         self.discharged = QCheckBox("Пациентка выписана")
@@ -117,12 +124,23 @@ class ContractDialog(QDialog):
         self.delegate_passport_series.setPlaceholderText("0000 000000")
         self.delegate_passport_series.setInputMask("0000 000000;_")
 
-        self.service_insurance_number.setPlaceholderText("Номер полиса/страхового случая")
+        self.service_insurance_number.setPlaceholderText("Номер полиса/страхового случая ФОМС")
         self.comments.setPlaceholderText("Внутренний комментарий к договору")
         self.comments.setFixedHeight(90)
 
+        for text_edit in [
+            self.patient_reg_address,
+            self.patient_live_address,
+            self.patient_passport_issued_by,
+            self.delegate_reg_address,
+            self.delegate_live_address,
+            self.delegate_passport_issued_by,
+        ]:
+            text_edit.setFixedHeight(58)
+            text_edit.setAcceptRichText(False)
+
         for input_widget in self.findChildren(QLineEdit):
-            input_widget.setMinimumWidth(240)
+            input_widget.setMinimumWidth(max(input_widget.minimumWidth(), 110))
 
     def _build_layout(self) -> None:
         self.form = self._scrollable(self._build_contract_form())
@@ -147,9 +165,9 @@ class ContractDialog(QDialog):
     def _build_contract_form(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._build_contract_section())
-        layout.addWidget(self._build_patient_section())
-        layout.addWidget(self._build_delegate_section())
+        layout.addLayout(self._build_people_section())
         layout.addWidget(self._build_payment_section())
         layout.addWidget(self._build_discharge_section())
         layout.addStretch()
@@ -158,151 +176,111 @@ class ContractDialog(QDialog):
 
     def _build_contract_section(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(
-            self._group(
-                "Реквизиты",
-                [
-                    ("Номер договора", self.contract_number),
-                    ("Дата договора", self.contract_date),
-                    ("Категория", self.category),
-                    ("История родов", self.birth_history_number),
-                ],
-            )
-        )
+        layout = QGridLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
+        layout.setColumnStretch(3, 1)
+        layout.setColumnStretch(4, 0)
+        layout.addWidget(self._field("№ договора", self.contract_number), 0, 0)
+        layout.addWidget(self._field("Дата", self.contract_date), 0, 1)
+        layout.addWidget(self._field("№ истории родов", self.birth_history_number), 0, 2)
+        layout.addWidget(self._field("Категория", self.category), 0, 3)
+        layout.addWidget(self._checkbox_field("", self.delegate_enabled), 0, 4)
         page.setLayout(layout)
         return page
 
-    def _build_patient_section(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(
-            self._group(
-                "Пациент",
-                [
-                    ("ФИО", self.patient_name),
-                    ("Дата рождения", self.patient_birth_date),
-                    ("Телефон", self.patient_phone),
-                ],
-            )
-        )
-        layout.addWidget(
-            self._group(
-                "Адреса",
-                [
-                    ("Регистрация", self.patient_reg_address),
-                    ("Проживание", self.patient_live_address),
-                ],
-            )
-        )
-        layout.addWidget(
-            self._group(
-                "Паспорт",
-                [
-                    ("Серия/номер", self.patient_passport_series),
-                    ("Кем выдан", self.patient_passport_issued_by),
-                    ("Код подразделения", self.patient_passport_issued_code),
-                    ("Дата выдачи", self.patient_passport_date),
-                ],
-            )
-        )
-        page.setLayout(layout)
-        return page
+    def _build_people_section(self) -> QHBoxLayout:
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
 
-    def _build_delegate_section(self) -> QWidget:
+        columns = QHBoxLayout()
+        columns.setContentsMargins(0, 0, 0, 0)
+        columns.addWidget(self._build_person_column("пациента", is_delegate=False))
+        columns.addWidget(self._build_person_column("представителя", is_delegate=True))
+        outer.addLayout(columns)
+
+        foms_row = QHBoxLayout()
+        foms_row.setContentsMargins(0, 0, 0, 0)
+        foms_row.addWidget(self._field("№ ФОМС", self.service_insurance_number), 1)
+        foms_row.addWidget(QWidget(), 1)
+        outer.addLayout(foms_row)
+        return outer
+
+    def _build_person_column(self, suffix: str, is_delegate: bool) -> QWidget:
+        name = self.delegate_name if is_delegate else self.patient_name
+        birth_date = self.delegate_birth_date if is_delegate else self.patient_birth_date
+        reg_address = self.delegate_reg_address if is_delegate else self.patient_reg_address
+        live_address = self.delegate_live_address if is_delegate else self.patient_live_address
+        phone = self.delegate_phone if is_delegate else self.patient_phone
+        passport_series = self.delegate_passport_series if is_delegate else self.patient_passport_series
+        passport_issued_by = self.delegate_passport_issued_by if is_delegate else self.patient_passport_issued_by
+        passport_date = self.delegate_passport_date if is_delegate else self.patient_passport_date
+        passport_code = self.delegate_passport_issued_code if is_delegate else self.patient_passport_issued_code
+
         page = QWidget()
         layout = QVBoxLayout()
-        layout.addWidget(self.delegate_enabled)
-        layout.addWidget(
-            self._group(
-                "Представитель",
-                [
-                    ("ФИО", self.delegate_name),
-                    ("Дата рождения", self.delegate_birth_date),
-                    ("Телефон", self.delegate_phone),
-                ],
-            )
-        )
-        layout.addWidget(
-            self._group(
-                "Адреса представителя",
-                [
-                    ("Регистрация", self.delegate_reg_address),
-                    ("Проживание", self.delegate_live_address),
-                ],
-            )
-        )
-        layout.addWidget(
-            self._group(
-                "Паспорт представителя",
-                [
-                    ("Серия/номер", self.delegate_passport_series),
-                    ("Кем выдан", self.delegate_passport_issued_by),
-                    ("Код подразделения", self.delegate_passport_issued_code),
-                    ("Дата выдачи", self.delegate_passport_date),
-                ],
-            )
-        )
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._field(f"ФИО {suffix}", name))
+        layout.addWidget(self._field(f"Дата рождения {suffix}", birth_date))
+        layout.addWidget(self._field(f"Адрес регистрации {suffix}", reg_address))
+        layout.addWidget(self._field(f"Адрес проживания {suffix}", live_address))
+        layout.addWidget(self._field(f"Телефон {suffix}", phone))
+
+        layout.addWidget(self._field(f"Паспортные данные {suffix}", passport_series))
+        layout.addWidget(self._field("Кем выдан паспорт", passport_issued_by))
+        passport_meta = QHBoxLayout()
+        passport_meta.addWidget(self._field("Когда выдан паспорт", passport_date))
+        passport_meta.addWidget(self._field("Код подразделения", passport_code))
+        layout.addLayout(passport_meta)
         page.setLayout(layout)
         return page
 
     def _build_payment_section(self) -> QWidget:
-        page = QWidget()
+        group = QGroupBox("Условия договора")
         layout = QVBoxLayout()
-        service_type = QHBoxLayout()
-        service_type.addWidget(self.inpatient_treatment)
-        service_type.addWidget(self.childbirth)
-        service_type.addStretch()
-        service_widget = QWidget()
-        service_widget.setLayout(service_type)
-        payment_type = QHBoxLayout()
-        payment_type.addWidget(self.service_payed)
-        payment_type.addWidget(self.service_insurance)
-        payment_type.addStretch()
-        payment_widget = QWidget()
-        payment_widget.setLayout(payment_type)
 
-        layout.addWidget(
-            self._group(
-                "Тип договора",
-                [
-                    ("Услуги", service_widget),
-                    ("Оплата", payment_widget),
-                    ("Номер страхования", self.service_insurance_number),
-                ],
-            )
-        )
-        layout.addWidget(
-            self._group(
-                "Предоплата",
-                [
-                    ("Стационар", self.prepay_inpatient_treatment),
-                    ("Роды", self.prepay_childbirth),
-                ],
-            )
-        )
+        payment_row = QHBoxLayout()
+        payment_row.setContentsMargins(0, 0, 0, 0)
+        payment_row.addLayout(self._inline_group("Тип оплаты:", [self.service_payed, self.service_insurance]), 1)
+        payment_row.addLayout(self._inline_group("Услуги:", [self.inpatient_treatment, self.childbirth]), 1)
+        layout.addLayout(payment_row)
+
+        prepay_row = QHBoxLayout()
+        prepay_row.addWidget(self._field("Предоплата стационар", self.prepay_inpatient_treatment))
+        prepay_row.addWidget(self._field("Предоплата роды", self.prepay_childbirth))
+        layout.addLayout(prepay_row)
+
         if self.contract is not None:
             note = QLabel("Предоплата редактируется через платежи после создания договора.")
             note.setStyleSheet("color: #666;")
             layout.addWidget(note)
-        page.setLayout(layout)
-        return page
+        group.setLayout(layout)
+        return group
+
+    def _inline_group(self, label: str, widgets: list[QWidget]) -> QHBoxLayout:
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(QLabel(label))
+        for widget in widgets:
+            layout.addWidget(widget)
+        layout.addStretch()
+        return layout
 
     def _build_discharge_section(self) -> QWidget:
-        page = QWidget()
+        group = QGroupBox("Выписка")
         layout = QVBoxLayout()
-        layout.addWidget(
-            self._group(
-                "Выписка",
-                [
-                    ("Статус", self.discharged),
-                    ("Дата выписки", self.discharge_date),
-                    ("Комментарий", self.comments),
-                ],
-            )
-        )
-        page.setLayout(layout)
-        return page
+        status_row = QHBoxLayout()
+        status_row.addWidget(self.discharged)
+        status_row.addSpacing(16)
+        status_row.addWidget(QLabel("Дата выписки"))
+        status_row.addWidget(self.discharge_date, 1)
+        status_row.addStretch()
+        layout.addLayout(status_row)
+        layout.addWidget(self._field("Комментарий", self.comments))
+        group.setLayout(layout)
+        return group
 
     def _connect_signals(self) -> None:
         self.delegate_enabled.toggled.connect(self._set_delegate_enabled)
@@ -318,10 +296,10 @@ class ContractDialog(QDialog):
             "patient_name": self.patient_name.text().strip(),
             "patient_birth_date": self._to_datetime(self.patient_birth_date),
             "birth_history_number": self.birth_history_number.text().strip() or None,
-            "patient_reg_address": self.patient_reg_address.text().strip(),
-            "patient_live_address": self.patient_live_address.text().strip(),
+            "patient_reg_address": self._text_value(self.patient_reg_address),
+            "patient_live_address": self._text_value(self.patient_live_address),
             "patient_phone": self.patient_phone.text().strip(),
-            "patient_passport_issued_by": self.patient_passport_issued_by.text().strip(),
+            "patient_passport_issued_by": self._text_value(self.patient_passport_issued_by),
             "patient_passport_issued_code": self.patient_passport_issued_code.text().strip(),
             "patient_passport_series": self.patient_passport_series.text().strip(),
             "patient_passport_date": self._to_datetime(self.patient_passport_date),
@@ -357,20 +335,20 @@ class ContractDialog(QDialog):
         self.patient_name.setText(contract.patient_name)
         self._set_datetime(self.patient_birth_date, contract.patient_birth_date)
         self.birth_history_number.setText(contract.birth_history_number or "")
-        self.patient_reg_address.setText(contract.patient_reg_address)
-        self.patient_live_address.setText(contract.patient_live_address)
+        self.patient_reg_address.setPlainText(contract.patient_reg_address)
+        self.patient_live_address.setPlainText(contract.patient_live_address)
         self.patient_phone.setText(contract.patient_phone)
-        self.patient_passport_issued_by.setText(contract.patient_passport_issued_by)
+        self.patient_passport_issued_by.setPlainText(contract.patient_passport_issued_by)
         self.patient_passport_issued_code.setText(contract.patient_passport_issued_code)
         self.patient_passport_series.setText(contract.patient_passport_series)
         self._set_datetime(self.patient_passport_date, contract.patient_passport_date)
         self.delegate_enabled.setChecked(self._has_delegate(contract))
         self.delegate_name.setText(contract.delegate_name or "")
         self._set_datetime(self.delegate_birth_date, contract.delegate_birth_date)
-        self.delegate_reg_address.setText(contract.delegate_reg_address or "")
-        self.delegate_live_address.setText(contract.delegate_live_address or "")
+        self.delegate_reg_address.setPlainText(contract.delegate_reg_address or "")
+        self.delegate_live_address.setPlainText(contract.delegate_live_address or "")
         self.delegate_phone.setText(contract.delegate_phone or "")
-        self.delegate_passport_issued_by.setText(contract.delegate_passport_issued_by or "")
+        self.delegate_passport_issued_by.setPlainText(contract.delegate_passport_issued_by or "")
         self.delegate_passport_issued_code.setText(contract.delegate_passport_issued_code or "")
         self.delegate_passport_series.setText(contract.delegate_passport_series or "")
         self._set_datetime(self.delegate_passport_date, contract.delegate_passport_date)
@@ -378,8 +356,10 @@ class ContractDialog(QDialog):
         self.childbirth.setChecked(bool(contract.childbirth))
         self.prepay_inpatient_treatment.setValue(float(contract.prepay_inpatient_treatment or 0))
         self.prepay_childbirth.setValue(float(contract.prepay_childbirth or 0))
-        self.service_payed.setChecked(bool(contract.service_payed))
-        self.service_insurance.setChecked(bool(contract.service_insurance))
+        if contract.service_insurance:
+            self.service_insurance.setChecked(True)
+        else:
+            self.service_payed.setChecked(True)
         self.service_insurance_number.setText(contract.service_insurance_number or "")
         self.discharged.setChecked(bool(contract.discharged))
         self._set_datetime(self.discharge_date, contract.discharge_date)
@@ -390,23 +370,28 @@ class ContractDialog(QDialog):
     def _load_from_source(self, contract: Contract) -> None:
         self.patient_name.setText(contract.patient_name)
         self._set_datetime(self.patient_birth_date, contract.patient_birth_date)
-        self.patient_reg_address.setText(contract.patient_reg_address)
-        self.patient_live_address.setText(contract.patient_live_address)
+        self.patient_reg_address.setPlainText(contract.patient_reg_address)
+        self.patient_live_address.setPlainText(contract.patient_live_address)
         self.patient_phone.setText(contract.patient_phone)
-        self.patient_passport_issued_by.setText(contract.patient_passport_issued_by)
+        self.patient_passport_issued_by.setPlainText(contract.patient_passport_issued_by)
         self.patient_passport_issued_code.setText(contract.patient_passport_issued_code)
         self.patient_passport_series.setText(contract.patient_passport_series)
         self._set_datetime(self.patient_passport_date, contract.patient_passport_date)
         self.delegate_enabled.setChecked(self._has_delegate(contract))
         self.delegate_name.setText(contract.delegate_name or "")
         self._set_datetime(self.delegate_birth_date, contract.delegate_birth_date)
-        self.delegate_reg_address.setText(contract.delegate_reg_address or "")
-        self.delegate_live_address.setText(contract.delegate_live_address or "")
+        self.delegate_reg_address.setPlainText(contract.delegate_reg_address or "")
+        self.delegate_live_address.setPlainText(contract.delegate_live_address or "")
         self.delegate_phone.setText(contract.delegate_phone or "")
-        self.delegate_passport_issued_by.setText(contract.delegate_passport_issued_by or "")
+        self.delegate_passport_issued_by.setPlainText(contract.delegate_passport_issued_by or "")
         self.delegate_passport_issued_code.setText(contract.delegate_passport_issued_code or "")
         self.delegate_passport_series.setText(contract.delegate_passport_series or "")
         self._set_datetime(self.delegate_passport_date, contract.delegate_passport_date)
+        if contract.service_insurance:
+            self.service_insurance.setChecked(True)
+            self.service_insurance_number.setText(contract.service_insurance_number or "")
+        else:
+            self.service_payed.setChecked(True)
 
     def _date_time_edit(self) -> QDateTimeEdit:
         widget = QDateTimeEdit()
@@ -435,6 +420,30 @@ class ContractDialog(QDialog):
         group.setLayout(form)
         return group
 
+    def _field(self, label: str, widget: QWidget) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        caption = QLabel(label)
+        caption.setStyleSheet("font-size: 12px;")
+        layout.addWidget(caption)
+        layout.addWidget(widget)
+        page.setLayout(layout)
+        return page
+
+    def _checkbox_field(self, label: str, widget: QWidget) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        caption = QLabel(label or " ")
+        caption.setStyleSheet("font-size: 12px;")
+        layout.addWidget(caption)
+        layout.addWidget(widget)
+        page.setLayout(layout)
+        return page
+
     def _scrollable(self, page: QWidget) -> QScrollArea:
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -453,7 +462,14 @@ class ContractDialog(QDialog):
         widget.setDateTime(QDateTime(normalized))
 
     def _optional_text(self, widget: QLineEdit) -> str | None:
-        return widget.text().strip() or None
+        return self._text_value(widget) or None
+
+    def _text_value(self, widget: QWidget) -> str:
+        if isinstance(widget, QTextEdit):
+            return widget.toPlainText().strip()
+        if isinstance(widget, QLineEdit):
+            return widget.text().strip()
+        return ""
 
     def _set_category(self, value: str | None) -> None:
         if not value:
@@ -464,7 +480,7 @@ class ContractDialog(QDialog):
             index = self.category.findData(value)
         self.category.setCurrentIndex(index)
 
-    def _optional_delegate_text(self, widget: QLineEdit) -> str | None:
+    def _optional_delegate_text(self, widget: QWidget) -> str | None:
         if not self.delegate_enabled.isChecked():
             return None
         return self._optional_text(widget)

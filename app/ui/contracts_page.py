@@ -7,18 +7,33 @@ from app.services import ContractService
 from app.services.exceptions import DomainError
 from app.ui.contract_dialog import ContractDialog
 from app.ui.contracts_table_model import ContractsTableModel
-from app.ui.icons import ICON_CONTRACT, ICON_DELETE, ICON_EDIT, ICON_NEW, ICON_OPEN, icon_for, set_button_icon
+from app.ui.icons import (
+    ICON_CONTRACT,
+    ICON_DELETE,
+    ICON_EDIT,
+    ICON_NEW,
+    ICON_OPEN,
+    ICON_REFRESH,
+    icon_for,
+    set_button_icon,
+)
 from app.ui.qt import (
+    QAction,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QComboBox,
     QDateTime,
     QDateTimeEdit,
+    QGroupBox,
     QLabel,
+    QKeySequence,
     QLineEdit,
     QMenu,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
+    QShortcut,
     QSortFilterProxyModel,
     QTableView,
     QVBoxLayout,
@@ -40,6 +55,18 @@ class ContractsPage(QWidget):
     PERIOD_CURRENT_YEAR = "Текущий год"
     PERIOD_ALL = "Все договоры"
     PERIOD_CUSTOM = "Произвольный период"
+    PAYMENT_ALL = "Все"
+    PAYMENT_PAID = "Платно"
+    PAYMENT_INSURANCE = "Страховая"
+    PAYMENT_UNSET = "Не указан"
+    BALANCE_ALL = "Все"
+    BALANCE_PAID = "Оплачен"
+    BALANCE_DEBT = "Долг"
+    BALANCE_OVERPAID = "Переплата"
+    BALANCE_NO_ACTS = "Без актов"
+    VISIBILITY_ACTIVE = "Активные"
+    VISIBILITY_ALL = "Все"
+    VISIBILITY_DELETED = "Удаленные"
 
     def __init__(self, current_user: User, contract_service: ContractService | None = None, on_open_contract=None) -> None:
         super().__init__()
@@ -54,6 +81,7 @@ class ContractsPage(QWidget):
         self.proxy_model.setSortRole(Qt.UserRole)
         self.last_focused_contract_id: int | None = None
         self._updating_period_controls = False
+        self._filters_stacked = False
 
         self.title_label = QLabel("Договоры")
         self.title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
@@ -77,25 +105,70 @@ class ContractsPage(QWidget):
 
         self.date_from_input = self._date_filter_input()
         self.date_to_input = self._date_filter_input()
+        self.period_input.setMinimumWidth(130)
+        self.period_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.date_from_input.dateTimeChanged.connect(self._date_filter_changed)
         self.date_to_input.dateTimeChanged.connect(self._date_filter_changed)
+
+        self.payment_type_input = QComboBox()
+        for payment_type in [self.PAYMENT_ALL, self.PAYMENT_PAID, self.PAYMENT_INSURANCE, self.PAYMENT_UNSET]:
+            self.payment_type_input.addItem(payment_type, payment_type)
+        self.payment_type_input.setMinimumWidth(88)
+        self.payment_type_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.payment_type_input.currentIndexChanged.connect(self._apply_filter)
+
+        self.balance_status_input = QComboBox()
+        for balance_status in [
+            self.BALANCE_ALL,
+            self.BALANCE_PAID,
+            self.BALANCE_DEBT,
+            self.BALANCE_OVERPAID,
+            self.BALANCE_NO_ACTS,
+        ]:
+            self.balance_status_input.addItem(balance_status, balance_status)
+        self.balance_status_input.setMinimumWidth(100)
+        self.balance_status_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.balance_status_input.currentIndexChanged.connect(self._apply_filter)
+
+        self.visibility_input = QComboBox()
+        for visibility in [self.VISIBILITY_ACTIVE, self.VISIBILITY_ALL, self.VISIBILITY_DELETED]:
+            self.visibility_input.addItem(visibility, visibility)
+        self.visibility_input.setMinimumWidth(105)
+        self.visibility_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.visibility_input.currentIndexChanged.connect(lambda *_: self.reload())
 
         self.create_button = QPushButton("Создать")
         self.clone_button = QPushButton("На основе")
         self.edit_button = QPushButton("Редактировать")
         self.open_button = QPushButton("Открыть")
         self.delete_button = QPushButton("Удалить")
+        self.refresh_button = QPushButton("Обновить")
+        self.reset_filters_button = QPushButton("Сбросить")
         set_button_icon(self.create_button, ICON_NEW)
         set_button_icon(self.clone_button, ICON_CONTRACT)
         set_button_icon(self.edit_button, ICON_EDIT)
         set_button_icon(self.open_button, ICON_OPEN)
         set_button_icon(self.delete_button, ICON_DELETE)
+        set_button_icon(self.refresh_button, ICON_REFRESH)
+        set_button_icon(self.reset_filters_button, ICON_REFRESH)
+        self.reset_filters_button.setStyleSheet(
+            "QPushButton {"
+            "background: #ffffff;"
+            "border: 1px solid #cbd5e1;"
+            "border-radius: 4px;"
+            "color: #334155;"
+            "padding: 4px 10px;"
+            "}"
+            "QPushButton:hover { background: #f8fafc; }"
+        )
 
         self.create_button.clicked.connect(self.create_contract)
         self.clone_button.clicked.connect(self._clone_contract)
         self.edit_button.clicked.connect(self._edit_contract)
         self.open_button.clicked.connect(self._open_contract)
         self.delete_button.clicked.connect(self._delete_contract)
+        self.refresh_button.clicked.connect(self.reload)
+        self.reset_filters_button.clicked.connect(self._reset_filters)
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(self.create_button)
@@ -103,16 +176,47 @@ class ContractsPage(QWidget):
         toolbar.addWidget(self.edit_button)
         toolbar.addWidget(self.open_button)
         toolbar.addWidget(self.delete_button)
+        toolbar.addWidget(self.refresh_button)
         toolbar.addStretch()
 
-        period_toolbar = QHBoxLayout()
-        period_toolbar.addWidget(QLabel("Период"))
-        period_toolbar.addWidget(self.period_input)
-        period_toolbar.addWidget(QLabel("с"))
-        period_toolbar.addWidget(self.date_from_input)
-        period_toolbar.addWidget(QLabel("по"))
-        period_toolbar.addWidget(self.date_to_input)
-        period_toolbar.addStretch()
+        self.period_group = self._filter_group("Период")
+        period_layout = QGridLayout(self.period_group)
+        period_layout.setContentsMargins(10, 8, 10, 8)
+        period_layout.setHorizontalSpacing(8)
+        period_layout.setVerticalSpacing(6)
+        period_layout.addWidget(QLabel("Тип"), 0, 0)
+        period_layout.addWidget(self.period_input, 0, 1)
+        period_layout.addWidget(QLabel("с"), 0, 2)
+        period_layout.addWidget(self.date_from_input, 0, 3)
+        period_layout.addWidget(QLabel("по"), 0, 4)
+        period_layout.addWidget(self.date_to_input, 0, 5)
+        period_layout.setColumnStretch(1, 2)
+        period_layout.setColumnStretch(3, 1)
+        period_layout.setColumnStretch(5, 1)
+
+        self.params_group = self._filter_group("Фильтры")
+        params_layout = QGridLayout(self.params_group)
+        params_layout.setContentsMargins(10, 8, 10, 8)
+        params_layout.setHorizontalSpacing(8)
+        params_layout.setVerticalSpacing(6)
+        params_layout.addWidget(QLabel("Оплата"), 0, 0)
+        params_layout.addWidget(self.payment_type_input, 0, 1)
+        params_layout.addWidget(QLabel("Баланс"), 0, 2)
+        params_layout.addWidget(self.balance_status_input, 0, 3)
+        params_layout.addWidget(QLabel("Видимость"), 0, 4)
+        params_layout.addWidget(self.visibility_input, 0, 5)
+        params_layout.setColumnStretch(1, 1)
+        params_layout.setColumnStretch(3, 1)
+        params_layout.setColumnStretch(5, 1)
+
+        filters_panel = QWidget()
+        filters_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.filters_layout = QGridLayout(filters_panel)
+        self.filters_layout.setContentsMargins(0, 0, 0, 0)
+        self.filters_layout.setHorizontalSpacing(8)
+        self.filters_layout.setVerticalSpacing(6)
+        self.reset_filters_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self._set_filters_layout(stacked=False)
 
         self.table = QTableView()
         self.table.setModel(self.proxy_model)
@@ -124,8 +228,20 @@ class ContractsPage(QWidget):
         self.table.doubleClicked.connect(self._open_contract)
         self.table.customContextMenuRequested.connect(self._open_context_menu)
         self.table.selectionModel().selectionChanged.connect(self._update_selection)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.horizontalHeader().setSortIndicatorShown(True)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setStretchLastSection(True)
+        header.setSortIndicatorShown(True)
+        self.table.setColumnWidth(0, 130)
+        self.table.setColumnWidth(1, 100)
+        self.table.setColumnWidth(2, 230)
+        self.table.setColumnWidth(3, 110)
+        self.table.setColumnWidth(4, 120)
+        self.table.setColumnWidth(5, 140)
+        self.table.setColumnWidth(6, 145)
+        self.table.setColumnWidth(7, 110)
+        self.table.setColumnWidth(8, 100)
+        self.table.setColumnWidth(9, 105)
 
         self.summary_label = QLabel("")
         self.summary_label.setStyleSheet("font-weight: 600;")
@@ -143,20 +259,25 @@ class ContractsPage(QWidget):
         layout = QVBoxLayout()
         layout.addLayout(header)
         layout.addLayout(toolbar)
-        layout.addLayout(period_toolbar)
+        layout.addWidget(filters_panel)
         layout.addWidget(self.search_input)
         layout.addWidget(self.table)
         layout.addWidget(self.summary_label)
         layout.addWidget(self.details_label)
         self.setLayout(layout)
 
+        self._setup_shortcuts()
         self._apply_period_preset(self.PERIOD_LAST_3_MONTHS)
         self.reload()
 
     def reload(self) -> None:
         """Reload active contracts from the service and re-apply UI filters."""
-        self.contracts = self.contract_service.list_contracts()
-        self.summaries = self.contract_service.list_contract_summaries()
+        selected = self._selected_contract()
+        if selected is not None:
+            self.last_focused_contract_id = selected.id
+        include_deleted = self.visibility_input.currentData() != self.VISIBILITY_ACTIVE
+        self.contracts = self.contract_service.list_contracts({"include_deleted": include_deleted})
+        self.summaries = self.contract_service.list_contract_summaries(include_deleted=include_deleted)
         self._apply_filter()
 
     def _apply_filter(self) -> None:
@@ -168,12 +289,15 @@ class ContractsPage(QWidget):
             for contract in self.contracts
             if self._is_in_date_range(contract, date_from, date_to)
             and (not query or query in self._contract_text(contract))
+            and self._matches_visibility(contract)
+            and self._matches_payment_type(contract)
+            and self._matches_balance_status(contract)
         ]
 
         self.model.set_contracts(contracts, self.summaries)
         self._restore_focus()
         self.summary_label.setText(
-            f"Показано: {len(contracts)} из {len(self.contracts)}" if query else f"Всего договоров: {len(contracts)}"
+            f"Показано: {len(contracts)} из {len(self.contracts)}" if self._has_active_filters() else f"Всего договоров: {len(contracts)}"
         )
         self._update_selection()
 
@@ -219,6 +343,9 @@ class ContractsPage(QWidget):
         if contract is None:
             self._show_error("Выберите договор")
             return
+        if contract.deleted:
+            self._show_error("Удаленный договор нельзя редактировать")
+            return
         self.last_focused_contract_id = contract.id
 
         dialog = ContractDialog(contract)
@@ -260,6 +387,9 @@ class ContractsPage(QWidget):
         if contract is None:
             self._show_error("Выберите договор")
             return
+        if contract.deleted:
+            self._show_error("Удаленный договор нельзя открыть")
+            return
         self.last_focused_contract_id = contract.id
         if self.on_open_contract is not None:
             self.on_open_contract(contract.id)
@@ -272,9 +402,16 @@ class ContractsPage(QWidget):
         if contract is None:
             self._show_error("Выберите договор")
             return
+        if contract.deleted:
+            self._show_error("Договор уже удален")
+            return
         self.last_focused_contract_id = contract.id
 
-        confirmed = QMessageBox.question(self, "Удалить договор", f"Удалить договор {contract.contract_number}?")
+        confirmed = QMessageBox.question(
+            self,
+            "Удалить договор",
+            f"Удалить договор {contract.contract_number}?\nСвязанные акты и платежи тоже будут скрыты.",
+        )
         if confirmed != QMessageBox.Yes:
             return
 
@@ -296,19 +433,23 @@ class ContractsPage(QWidget):
         menu = QMenu(self)
         create_action = menu.addAction(icon_for(ICON_NEW), "Создать договор")
         clone_action = menu.addAction(icon_for(ICON_CONTRACT), "Создать на основе")
+        refresh_action = menu.addAction(icon_for(ICON_REFRESH), "Обновить")
         menu.addSeparator()
         open_action = menu.addAction(icon_for(ICON_OPEN), "Открыть")
         edit_action = menu.addAction(icon_for(ICON_EDIT), "Редактировать")
         delete_action = menu.addAction(icon_for(ICON_DELETE), "Удалить")
         has_contract = contract is not None
+        is_deleted = bool(contract and contract.deleted)
         clone_action.setEnabled(has_contract)
-        open_action.setEnabled(has_contract)
-        edit_action.setEnabled(has_contract)
-        delete_action.setEnabled(has_contract)
+        open_action.setEnabled(has_contract and not is_deleted)
+        edit_action.setEnabled(has_contract and not is_deleted)
+        delete_action.setEnabled(has_contract and not is_deleted)
 
         action = menu.exec_(self.table.viewport().mapToGlobal(position))
         if action == create_action:
             self.create_contract()
+        elif action == refresh_action:
+            self.reload()
         elif action == clone_action:
             self._clone_contract()
         elif action == open_action:
@@ -322,21 +463,23 @@ class ContractsPage(QWidget):
         """Refresh action availability and the selected-contract summary panel."""
         contract = self._selected_contract()
         has_selection = contract is not None
-        self.edit_button.setEnabled(has_selection)
+        is_deleted = bool(contract and contract.deleted)
+        self.edit_button.setEnabled(has_selection and not is_deleted)
         self.clone_button.setEnabled(has_selection)
-        self.open_button.setEnabled(has_selection)
-        self.delete_button.setEnabled(has_selection)
+        self.open_button.setEnabled(has_selection and not is_deleted)
+        self.delete_button.setEnabled(has_selection and not is_deleted)
         if contract is None:
             self.details_label.setText("Выберите договор")
             return
 
+        deleted_text = " | удален" if contract.deleted else ""
         detail = (
             f"{contract.contract_number} | {contract.patient_name} | тел.: {contract.patient_phone or '-'} | "
-            f"история родов: {contract.birth_history_number or '-'} | {self._payment_type(contract)}"
+            f"история родов: {contract.birth_history_number or '-'} | {self._payment_type(contract)}{deleted_text}"
         )
         summary = self.summaries.get(contract.id)
         if summary:
-            detail += " | баланс: {balance} | статус: {status}".format(**summary)
+            detail += f" | баланс: {summary['balance']} | статус: {self._status_text(contract)}"
         self.details_label.setText(detail)
 
     def focus_contract(self, contract_id: int | None) -> None:
@@ -370,12 +513,146 @@ class ContractsPage(QWidget):
             return "платно"
         return "тип оплаты не указан"
 
+    def _setup_shortcuts(self) -> None:
+        new_action = QAction(self)
+        new_action.setShortcut(QKeySequence("Ctrl+N"))
+        new_action.triggered.connect(self.create_contract)
+        self.addAction(new_action)
+
+        refresh_action = QAction(self)
+        refresh_action.setShortcut(QKeySequence("F5"))
+        refresh_action.triggered.connect(self.reload)
+        self.addAction(refresh_action)
+
+        delete_action = QAction(self)
+        delete_action.setShortcut(QKeySequence("Delete"))
+        delete_action.triggered.connect(self._delete_contract)
+        self.addAction(delete_action)
+
+        search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        search_shortcut.activated.connect(self.search_input.setFocus)
+
+        open_shortcut = QShortcut(QKeySequence("Return"), self.table)
+        open_shortcut.activated.connect(self._open_contract)
+
+        reset_search_shortcut = QShortcut(QKeySequence("Esc"), self.search_input)
+        reset_search_shortcut.activated.connect(self.search_input.clear)
+
+    def _reset_filters(self) -> None:
+        self.search_input.clear()
+        self.payment_type_input.setCurrentIndex(self.payment_type_input.findData(self.PAYMENT_ALL))
+        self.balance_status_input.setCurrentIndex(self.balance_status_input.findData(self.BALANCE_ALL))
+        self.visibility_input.setCurrentIndex(self.visibility_input.findData(self.VISIBILITY_ACTIVE))
+        self.period_input.setCurrentIndex(self.period_input.findData(self.PERIOD_LAST_3_MONTHS))
+        self._apply_period_preset(self.PERIOD_LAST_3_MONTHS)
+        self._apply_filter()
+
+    def _has_active_filters(self) -> bool:
+        return (
+            bool(self.search_input.text().strip())
+            or self.period_input.currentData() != self.PERIOD_LAST_3_MONTHS
+            or self.payment_type_input.currentData() != self.PAYMENT_ALL
+            or self.balance_status_input.currentData() != self.BALANCE_ALL
+            or self.visibility_input.currentData() != self.VISIBILITY_ACTIVE
+        )
+
+    def _matches_visibility(self, contract: Contract) -> bool:
+        selected = self.visibility_input.currentData()
+        if selected == self.VISIBILITY_ALL:
+            return True
+        if selected == self.VISIBILITY_DELETED:
+            return bool(contract.deleted)
+        return not bool(contract.deleted)
+
+    def _matches_payment_type(self, contract: Contract) -> bool:
+        selected = self.payment_type_input.currentData()
+        if selected == self.PAYMENT_ALL:
+            return True
+        if selected == self.PAYMENT_PAID:
+            return bool(contract.service_payed) and not bool(contract.service_insurance)
+        if selected == self.PAYMENT_INSURANCE:
+            return bool(contract.service_insurance)
+        if selected == self.PAYMENT_UNSET:
+            return not bool(contract.service_payed) and not bool(contract.service_insurance)
+        return True
+
+    def _matches_balance_status(self, contract: Contract) -> bool:
+        selected = self.balance_status_input.currentData()
+        if selected == self.BALANCE_ALL:
+            return True
+        return self._status_text(contract) == selected
+
+    def _status_text(self, contract: Contract) -> str:
+        if contract.deleted:
+            return "Удален"
+        summary = self.summaries.get(contract.id, {})
+        if summary.get("services_total") == 0 and summary.get("payments_total") == 0:
+            return self.BALANCE_NO_ACTS
+        status = summary.get("status")
+        if status == "debt":
+            return self.BALANCE_DEBT
+        if status == "overpaid":
+            return self.BALANCE_OVERPAID
+        if status == "paid":
+            return self.BALANCE_PAID
+        return ""
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._set_filters_layout(stacked=self.width() < 980)
+
+    def _set_filters_layout(self, stacked: bool) -> None:
+        if self._filters_stacked == stacked and self.filters_layout.indexOf(self.period_group) >= 0:
+            return
+
+        for widget in [self.period_group, self.params_group, self.reset_filters_button]:
+            self.filters_layout.removeWidget(widget)
+
+        if stacked:
+            self.filters_layout.addWidget(self.period_group, 0, 0)
+            self.filters_layout.addWidget(self.params_group, 1, 0)
+            self.filters_layout.addWidget(self.reset_filters_button, 0, 1, 2, 1)
+            self.filters_layout.setColumnStretch(0, 1)
+            self.filters_layout.setColumnStretch(1, 0)
+            self.filters_layout.setRowStretch(0, 1)
+            self.filters_layout.setRowStretch(1, 1)
+        else:
+            self.filters_layout.addWidget(self.period_group, 0, 0)
+            self.filters_layout.addWidget(self.params_group, 0, 1)
+            self.filters_layout.addWidget(self.reset_filters_button, 0, 2)
+            self.filters_layout.setColumnStretch(0, 3)
+            self.filters_layout.setColumnStretch(1, 2)
+            self.filters_layout.setColumnStretch(2, 0)
+            self.filters_layout.setRowStretch(0, 1)
+            self.filters_layout.setRowStretch(1, 0)
+
+        self._filters_stacked = stacked
+
+    def _filter_group(self, title: str) -> QGroupBox:
+        group = QGroupBox(title)
+        group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        group.setStyleSheet(
+            "QGroupBox {"
+            "background: #f8fafc;"
+            "border: 1px solid #d8e2ef;"
+            "border-radius: 6px;"
+            "color: #1f4f82;"
+            "font-weight: 600;"
+            "margin-top: 10px;"
+            "}"
+            "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
+            "QLabel { border: none; background: transparent; color: #475569; }"
+            "QComboBox, QDateTimeEdit { background: #ffffff; }"
+        )
+        return group
+
     def _date_filter_input(self) -> QDateTimeEdit:
         """Create a compact date-time control used by registry period filters."""
         widget = QDateTimeEdit()
         widget.setCalendarPopup(True)
         widget.setDisplayFormat("dd.MM.yyyy")
-        widget.setMinimumWidth(132)
+        widget.setMinimumWidth(104)
+        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         return widget
 
     def _period_changed(self) -> None:

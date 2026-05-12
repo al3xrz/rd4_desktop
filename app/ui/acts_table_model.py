@@ -26,20 +26,22 @@ class ActsTableModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
         if not index.isValid():
             return None
-        if role == Qt.TextAlignmentRole and index.column() == 2:
-            return Qt.AlignRight | Qt.AlignVCenter
+        if role == Qt.TextAlignmentRole:
+            return self._alignment(index.column())
         if role != Qt.DisplayRole:
             return None
         act = self.acts[index.row()]
         values = [
             act.number,
             act.date.strftime("%d.%m.%Y") if act.date else "",
-            self._format_money(self._services_total(act)),
+            self._format_money(self.services_total(act)),
             act.comments or "",
         ]
         return values[index.column()]
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole):
+        if role == Qt.TextAlignmentRole and orientation == Qt.Horizontal:
+            return self._alignment(section)
         if role != Qt.DisplayRole:
             return None
         if orientation == Qt.Horizontal:
@@ -56,7 +58,7 @@ class ActsTableModel(QAbstractTableModel):
         self.acts = acts
         self.endResetModel()
 
-    def _services_total(self, act: Act) -> Decimal:
+    def services_total(self, act: Act) -> Decimal:
         total = Decimal("0")
         for row in act.services:
             if not row.deleted:
@@ -65,3 +67,10 @@ class ActsTableModel(QAbstractTableModel):
 
     def _format_money(self, value: Decimal) -> str:
         return str(value.quantize(Decimal("0.01")))
+
+    def _alignment(self, column: int):
+        if column in {0, 1}:
+            return int(Qt.AlignCenter)
+        if column == 2:
+            return int(Qt.AlignRight | Qt.AlignVCenter)
+        return int(Qt.AlignLeft | Qt.AlignVCenter)

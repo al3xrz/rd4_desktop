@@ -35,23 +35,19 @@ class ContractDetailsPage(QWidget):
         self.patient_label = QLabel("")
         self.summary_label = QLabel("")
 
-        self.print_paid_button = QPushButton("Печать договора")
-        self.print_foms_button = QPushButton("Печать ФОМС")
+        self.print_contract_button = QPushButton("Печать договора")
         self.edit_button = QPushButton("Редактировать")
         set_button_icon(self.edit_button, ICON_EDIT)
-        set_button_icon(self.print_paid_button, ICON_PRINT)
-        set_button_icon(self.print_foms_button, ICON_PRINT)
+        set_button_icon(self.print_contract_button, ICON_PRINT)
         self.edit_button.clicked.connect(self._edit_contract)
-        self.print_paid_button.clicked.connect(self._print_paid_contract)
-        self.print_foms_button.clicked.connect(self._print_foms_contract)
+        self.print_contract_button.clicked.connect(self._print_contract)
 
         header = QHBoxLayout()
         header.addWidget(self.back_button)
         header.addWidget(self.title_label)
         header.addStretch()
         header.addWidget(self.edit_button)
-        header.addWidget(self.print_paid_button)
-        header.addWidget(self.print_foms_button)
+        header.addWidget(self.print_contract_button)
 
         self.tabs = QTabWidget()
         self.payments_panel = PaymentsPanel(contract_id, current_user, on_changed=self.reload)
@@ -101,11 +97,16 @@ class ContractDetailsPage(QWidget):
         if self.on_back is not None:
             self.on_back()
 
-    def _print_paid_contract(self) -> None:
+    def _print_contract(self) -> None:
+        try:
+            contract = self.contract_service.get_contract(self.contract_id)
+        except DomainError as exc:
+            self._show_error(str(exc))
+            return
+        if contract.service_insurance:
+            self._render_and_open(lambda: self.docx_service.render_foms_contract(self.contract_id))
+            return
         self._render_and_open(lambda: self.docx_service.render_paid_contract(self.contract_id))
-
-    def _print_foms_contract(self) -> None:
-        self._render_and_open(lambda: self.docx_service.render_foms_contract(self.contract_id))
 
     def _edit_contract(self) -> None:
         try:

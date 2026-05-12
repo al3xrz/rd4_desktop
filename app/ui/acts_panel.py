@@ -6,7 +6,20 @@ from app.services.exceptions import DomainError
 from app.ui.act_dialog import ActDialog
 from app.ui.acts_table_model import ActsTableModel
 from app.ui.icons import ICON_DELETE, ICON_NEW, ICON_OPEN, ICON_PRINT, set_button_icon
-from app.ui.qt import QGroupBox, QHBoxLayout, QHeaderView, QMessageBox, QPushButton, QTableView, QVBoxLayout, QWidget
+from app.ui.qt import (
+    QAction,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QKeySequence,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QShortcut,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class ActsPanel(QWidget):
@@ -25,6 +38,9 @@ class ActsPanel(QWidget):
         self.docx_service = docx_service or DocxService()
         self.on_changed = on_changed
         self.model = ActsTableModel()
+        self.summary_label = QLabel("Выберите акт")
+        self.summary_label.setStyleSheet("color: #666;")
+        self.summary_label.setWordWrap(True)
 
         self.create_button = QPushButton("Создать акт")
         self.open_button = QPushButton("Открыть акт")
@@ -69,6 +85,7 @@ class ActsPanel(QWidget):
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setSelectionMode(QTableView.SingleSelection)
         self.table.doubleClicked.connect(self._open_act)
+        self.table.selectionModel().selectionChanged.connect(self._update_selection)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
@@ -79,12 +96,15 @@ class ActsPanel(QWidget):
         layout = QVBoxLayout()
         layout.addLayout(toolbar)
         layout.addWidget(self.table)
+        layout.addWidget(self.summary_label)
         self.setLayout(layout)
 
+        self._setup_shortcuts()
         self.reload()
 
     def reload(self) -> None:
         self.model.set_acts(self.act_service.list_acts(self.contract_id))
+        self._update_selection()
 
     def _selected_act(self) -> Act | None:
         indexes = self.table.selectionModel().selectedRows()
@@ -96,6 +116,7 @@ class ActsPanel(QWidget):
         dialog = ActDialog(self.contract_id, self.current_user)
         if dialog.exec_() == ActDialog.Accepted:
             self._reload_and_notify()
+            self._print_saved_act_if_requested(dialog)
 
     def _open_act(self) -> None:
         act = self._selected_act()
@@ -110,6 +131,7 @@ class ActsPanel(QWidget):
         dialog = ActDialog(self.contract_id, self.current_user, act)
         if dialog.exec_() == ActDialog.Accepted:
             self._reload_and_notify()
+            self._print_saved_act_if_requested(dialog)
 
     def _delete_act(self) -> None:
         act = self._selected_act()
@@ -161,7 +183,56 @@ class ActsPanel(QWidget):
         except DomainError as exc:
             QMessageBox.warning(self, "Роддом №4", str(exc))
 
+    def _print_saved_act_if_requested(self, dialog: ActDialog) -> None:
+        if not dialog.print_after_save or dialog.saved_act_id is None:
+            return
+        try:
+            path = self.docx_service.render_act(dialog.saved_act_id)
+            self.docx_service.open_document(path)
+        except DomainError as exc:
+            QMessageBox.warning(self, "Роддом №4", str(exc))
+
     def _reload_and_notify(self) -> None:
         self.reload()
         if self.on_changed is not None:
             self.on_changed()
+
+    def _setup_shortcuts(self) -> None:
+        create_action = QAction(self)
+        create_action.setShortcut(QKeySequence("Ctrl+N"))
+        create_action.triggered.connect(self._create_act)
+        self.addAction(create_action)
+
+        delete_action = QAction(self)
+        delete_action.setShortcut(QKeySequence("Delete"))
+        delete_action.triggered.connect(self._delete_act)
+        self.addAction(delete_action)
+
+        print_action = QAction(self)
+        print_action.setShortcut(QKeySequence("Ctrl+P"))
+        print_action.triggered.connect(self._print_act)
+        self.addAction(print_action)
+
+        open_shortcut = QShortcut(QKeySequence("Return"), self.table)
+        open_shortcut.activated.connect(self._open_act)
+
+    def _update_selection(self, *args) -> None:
+        act = self._selected_act()
+        has_selection = act is not None
+        self.open_button.setEnabled(has_selection)
+        self.delete_button.setEnabled(has_selection)
+        self.print_tickets_button.setEnabled(has_selection)
+        self.print_act_button.setEnabled(has_selection)
+        self.print_all_button.setEnabled(has_selection)
+
+        if act is None:
+            if self.model.rowCount() == 0:
+                self.summary_label.setText("По договору ещё нет актов. Создайте акт, чтобы добавить оказанные услуги.")
+            else:
+                self.summary_label.setText("Выберите акт")
+            return
+
+        service_count = sum(1 for row in act.services if not row.deleted)
+        total = self.model.services_total(act)
+        comment = f" | комментарий: {act.comments}" if act.comments else ""
+        self.summary_label.setText(f"Акт: {act.number} | услуг: {service_count} | сумма: {total}{comment}")

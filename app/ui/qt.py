@@ -3,13 +3,15 @@ from __future__ import annotations
 
 try:
     from PySide2.QtCore import QAbstractTableModel, QDateTime, QModelIndex, QSortFilterProxyModel, Qt, Signal
-    from PySide2.QtGui import QBrush, QColor, QIcon, QPainter, QPen, QPixmap
+    from PySide2.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap
     from PySide2.QtWidgets import (
         QAction,
         QApplication,
+        QButtonGroup,
         QDialogButtonBox,
         QDoubleSpinBox,
         QFormLayout,
+        QGridLayout,
         QDialog,
         QFrame,
         QHBoxLayout,
@@ -23,6 +25,7 @@ try:
         QMenu,
         QMessageBox,
         QPushButton,
+        QRadioButton,
         QComboBox,
         QDateTimeEdit,
         QSizePolicy,
@@ -30,6 +33,7 @@ try:
         QStatusBar,
         QStyle,
         QScrollArea,
+        QShortcut,
         QTableView,
         QTabWidget,
         QTextEdit,

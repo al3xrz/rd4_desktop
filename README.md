@@ -9,6 +9,7 @@ Standalone desktop-версия RD4 на Python + PySide2 + SQLite.
 ```text
 Python: 3.8.x для Windows 7/10 build
 UI: PySide2 / Qt 5.15
+Icons: QtAwesome / Font Awesome
 Database: SQLite
 ORM: SQLAlchemy
 Migrations: Alembic
@@ -67,3 +68,8 @@ RD4_DATA_DIR=.rd4 .venv/bin/python -m app.services.smoke
 ## Build
 
 See [`WINDOWS7_BUILD_GUIDE.md`](WINDOWS7_BUILD_GUIDE.md) and [`packaging/README.md`](packaging/README.md).
+
+## UX
+
+Main page and registry UX proposal: [`MAIN_PAGE_UX_PROPOSAL.md`](MAIN_PAGE_UX_PROPOSAL.md).
+Acts tab UX proposal: [`ACTS_TAB_UX_PROPOSAL.md`](ACTS_TAB_UX_PROPOSAL.md).

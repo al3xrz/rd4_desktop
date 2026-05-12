@@ -59,7 +59,9 @@ class DocxService:
 
     def render_act(self, act_id: int) -> Path:
         act = self.act_service.get_act(act_id)
-        return self._render_act_document(act)
+        template_name = "act_foms_template.docx" if act.contract and act.contract.service_insurance else "act_paid_template.docx"
+        context = build_act_context(act)
+        return self._render_template(template_name, context, f"act_{act.number}.docx")
 
     def open_document(self, path: Path) -> None:
         if sys.platform.startswith("win"):
@@ -89,136 +91,76 @@ class DocxService:
         doc.save(str(output_path))
         return output_path
 
-    def _render_act_document(self, act: Any) -> Path:
-        try:
-            from docx import Document
-        except ImportError as exc:
-            raise BusinessRuleError("Для печати DOCX установите зависимость python-docx.") from exc
-
-        output_dir = Path(tempfile.gettempdir()) / "rd4"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / _safe_filename(f"act_{act.number}.docx")
-
-        rows = [row for row in act.services if not row.deleted]
-        total = Decimal("0")
-        document = Document()
-        document.add_heading(f"Акт N {act.number}", level=1)
-        document.add_paragraph(f"Дата: {date_ru(act.date)}")
-
-        contract = act.contract
-        if contract is not None:
-            document.add_paragraph(f"Договор: {contract.contract_number} от {date_ru(contract.contract_date)}")
-            document.add_paragraph(f"Пациент: {contract.patient_name}")
-
-        table = document.add_table(rows=1, cols=6)
-        table.style = "Table Grid"
-        header_cells = table.rows[0].cells
-        for index, title in enumerate(["Код", "Услуга", "Ед.", "Цена", "Кол-во", "Сумма"]):
-            header_cells[index].text = title
-
-        for row in rows:
-            line_total = row.price * row.count * (Decimal("1") - row.discount / Decimal("100"))
-            total += line_total
-            cells = table.add_row().cells
-            cells[0].text = row.current_code or ""
-            cells[1].text = row.current_name
-            cells[2].text = row.unit
-            cells[3].text = money_ru(row.price)
-            cells[4].text = str(row.count)
-            cells[5].text = money_ru(line_total)
-
-        document.add_paragraph(f"Итого: {money_ru(total)} руб.")
-        if act.comments:
-            document.add_paragraph(f"Комментарий: {act.comments}")
-
-        document.save(str(output_path))
-        return output_path
-
-
 def build_contract_context(contract: Any) -> dict[str, Any]:
     contract_day, contract_month, contract_year = date_parts_ru(contract.contract_date)
     patient_birth_day, patient_birth_month, patient_birth_year = date_parts_ru(contract.patient_birth_date)
     delegate_birth_day, delegate_birth_month, delegate_birth_year = date_parts_ru(contract.delegate_birth_date)
 
-    patient_passport = build_passport_lines(
+    patient_passport_full = build_passport_text(
         contract.patient_passport_issued_by,
         contract.patient_passport_issued_code,
         contract.patient_passport_series,
         contract.patient_passport_date,
     )
-    delegate_passport = build_passport_lines(
+    delegate_passport_full = build_passport_text(
         contract.delegate_passport_issued_by,
         contract.delegate_passport_issued_code,
         contract.delegate_passport_series,
         contract.delegate_passport_date,
     )
-
     return {
         "contract_number": contract.contract_number,
         "contract_day": contract_day,
         "contract_month": contract_month,
         "contract_year": contract_year,
         "patient_name": contract.patient_name,
-        "patient_name_l1": split_line(contract.patient_name, 42, 0),
-        "patient_name_l2": split_line(contract.patient_name, 42, 1),
         "patient_birth_day": patient_birth_day,
         "patient_birth_month": patient_birth_month,
         "patient_birth_year": patient_birth_year,
-        "patient_reg_address_l1": split_line(contract.patient_reg_address, 42, 0),
-        "patient_reg_address_l2": split_line(contract.patient_reg_address, 42, 1),
-        "patient_reg_address_l3": split_line(contract.patient_reg_address, 42, 2),
-        "patient_live_address_l1": split_line(contract.patient_live_address, 42, 0),
-        "patient_live_address_l2": split_line(contract.patient_live_address, 42, 1),
-        "patient_live_address_l3": split_line(contract.patient_live_address, 42, 2),
+        "patient_reg_address": contract.patient_reg_address,
+        "patient_live_address": contract.patient_live_address,
         "patient_phone": contract.patient_phone or "",
-        "patient_passport_l1": patient_passport[0],
-        "patient_passport_l2": patient_passport[1],
-        "patient_passport_l3": patient_passport[2],
-        "patient_passport_l4": patient_passport[3],
-        "delegate_name_l1": split_line(contract.delegate_name, 42, 0),
-        "delegate_name_l2": split_line(contract.delegate_name, 42, 1),
+        "patient_passport_full": patient_passport_full,
+        "delegate_name": contract.delegate_name or "",
         "delegate_birth_day": delegate_birth_day,
         "delegate_birth_month": delegate_birth_month,
         "delegate_birth_year": delegate_birth_year,
-        "delegate_reg_address_l1": split_line(contract.delegate_reg_address, 42, 0),
-        "delegate_reg_address_l2": split_line(contract.delegate_reg_address, 42, 1),
-        "delegate_reg_address_l3": split_line(contract.delegate_reg_address, 42, 2),
-        "delegate_live_address_l1": split_line(contract.delegate_live_address, 42, 0),
-        "delegate_live_address_l2": split_line(contract.delegate_live_address, 42, 1),
-        "delegate_live_address_l3": split_line(contract.delegate_live_address, 42, 2),
+        "delegate_reg_address": contract.delegate_reg_address or "",
+        "delegate_live_address": contract.delegate_live_address or "",
         "delegate_phone": contract.delegate_phone or "",
-        "delegate_passport_l1": delegate_passport[0],
-        "delegate_passport_l2": delegate_passport[1],
-        "delegate_passport_l3": delegate_passport[2],
-        "delegate_passport_l4": delegate_passport[3],
+        "delegate_passport_full": delegate_passport_full,
         "inpatient_mark": "V" if contract.inpatient_treatment else "",
         "childbirth_mark": "V" if contract.childbirth else "",
         "prepay_inpatient_mark": "V" if as_decimal(contract.prepay_inpatient_treatment) > 0 else "",
         "prepay_childbirth_mark": "V" if as_decimal(contract.prepay_childbirth) > 0 else "",
         "prepay_inpatient_amount": money_ru(contract.prepay_inpatient_treatment),
         "prepay_childbirth_amount": money_ru(contract.prepay_childbirth),
+        "prepay_inpatient_amount_words": money_words_ru(contract.prepay_inpatient_treatment),
+        "prepay_childbirth_amount_words": money_words_ru(contract.prepay_childbirth),
+        "delegate_birth_full": date_ru(contract.delegate_birth_date),
     }
 
 
 def build_foms_contract_context(contract: Any) -> dict[str, Any]:
     contract_day, contract_month, contract_year = date_parts_ru(contract.contract_date)
+    patient_birth_day, patient_birth_month, patient_birth_year = date_parts_ru(contract.patient_birth_date)
     return {
         "contract_number": contract.contract_number,
         "contract_day": contract_day,
         "contract_month": contract_month,
         "contract_year": contract_year,
+        "patient_birth_day": patient_birth_day,
+        "patient_birth_month": patient_birth_month,
+        "patient_birth_year": patient_birth_year,
         "patient_name": contract.patient_name,
         "patient_reg_address": contract.patient_reg_address,
         "patient_phone": contract.patient_phone or "",
         "insurance_number": contract.service_insurance_number or "",
-        "patient_passport_full": "; ".join(
-            part for part in build_passport_lines(
-                contract.patient_passport_issued_by,
-                contract.patient_passport_issued_code,
-                contract.patient_passport_series,
-                contract.patient_passport_date,
-            )
-            if part
+        "patient_passport_full": build_passport_text(
+            contract.patient_passport_issued_by,
+            contract.patient_passport_issued_code,
+            contract.patient_passport_series,
+            contract.patient_passport_date,
         ),
     }
 
@@ -261,6 +203,76 @@ def build_act_ticket_context(act: Any) -> dict[str, Any]:
     return context
 
 
+def build_act_context(act: Any) -> dict[str, Any]:
+    contract = act.contract
+    act_day, act_month, act_year = date_parts_ru(act.date)
+    contract_day, contract_month, contract_year = date_parts_ru(contract.contract_date if contract else None)
+    patient_birth_day, patient_birth_month, patient_birth_year = date_parts_ru(
+        contract.patient_birth_date if contract else None
+    )
+
+    rows = []
+    total = Decimal("0")
+    for index, row in enumerate([item for item in act.services if not item.deleted], start=1):
+        discount = as_decimal(row.discount)
+        price = as_decimal(row.price)
+        count = as_decimal(row.count)
+        discounted_price = price * (Decimal("1") - discount / Decimal("100"))
+        line_total = discounted_price * count
+        total += line_total
+        rows.append(
+            {
+                "number": str(index),
+                "name": row.current_name,
+                "count": quantity_ru(count),
+                "unit": row.unit,
+                "price": money_ru(price),
+                "discount": percent_ru(discount),
+                "discounted_price": money_ru(discounted_price),
+                "total": money_ru(line_total),
+            }
+        )
+
+    prepayment = Decimal("0")
+    if contract is not None:
+        prepayment = as_decimal(contract.prepay_inpatient_treatment) + as_decimal(contract.prepay_childbirth)
+    to_pay = total - prepayment
+    if to_pay < Decimal("0"):
+        to_pay = Decimal("0")
+
+    passport_full = build_passport_text(
+        contract.patient_passport_issued_by if contract else "",
+        contract.patient_passport_issued_code if contract else "",
+        contract.patient_passport_series if contract else "",
+        contract.patient_passport_date if contract else None,
+    )
+
+    return {
+        "act_number": act.number,
+        "act_day": act_day,
+        "act_month": act_month,
+        "act_year": act_year,
+        "contract_number": contract.contract_number if contract else "",
+        "contract_day": contract_day,
+        "contract_month": contract_month,
+        "contract_year": contract_year,
+        "patient_name": contract.patient_name if contract else "",
+        "patient_birth_day": patient_birth_day,
+        "patient_birth_month": patient_birth_month,
+        "patient_birth_year": patient_birth_year,
+        "patient_reg_address": contract.patient_reg_address if contract else "",
+        "patient_live_address": contract.patient_live_address if contract else "",
+        "patient_phone": contract.patient_phone if contract else "",
+        "patient_passport_full": passport_full,
+        "total_amount": money_ru(total),
+        "prepayment_amount": money_ru(prepayment),
+        "amount_due": money_ru(to_pay),
+        "total_amount_words": money_with_words_ru(total),
+        "vat_amount": "0,00",
+        "services": rows,
+    }
+
+
 def date_parts_ru(value: datetime | None) -> tuple[str, str, str]:
     if value is None:
         return "", "", ""
@@ -273,11 +285,11 @@ def date_ru(value: datetime | None) -> str:
     return f"«{value.day}» {RU_MONTHS.get(value.month, str(value.month))} {value.year} г"
 
 
-def build_passport_lines(issued_by: Any, issued_code: Any, series: Any, issued_date: Any) -> list[str]:
+def build_passport_text(issued_by: Any, issued_code: Any, series: Any, issued_date: Any) -> str:
     issued_date_text = ""
     if issued_date:
         issued_date_text = f"{issued_date.day:02d}.{issued_date.month:02d}.{issued_date.year}"
-    text = "; ".join(
+    return "; ".join(
         part
         for part in [
             f"Серия/номер: {series or ''}",
@@ -287,35 +299,10 @@ def build_passport_lines(issued_by: Any, issued_code: Any, series: Any, issued_d
         ]
         if part.split(": ", 1)[1]
     )
-    lines = split_lines(text, 58, 4)
-    return lines
 
 
-def split_lines(value: Any, max_len: int, max_lines: int) -> list[str]:
-    text = " ".join(str(value or "").split())
-    if not text:
-        return [""] * max_lines
-
-    words = text.split(" ")
-    lines: list[str] = []
-    current = ""
-    for word in words:
-        if not current:
-            current = word
-        elif len(current) + 1 + len(word) <= max_len:
-            current = f"{current} {word}"
-        else:
-            lines.append(current)
-            current = word
-        if len(lines) >= max_lines:
-            break
-    if current and len(lines) < max_lines:
-        lines.append(current)
-    return lines[:max_lines] + [""] * (max_lines - len(lines))
-
-
-def split_line(value: Any, max_len: int, index: int) -> str:
-    return split_lines(value, max_len, index + 1)[index]
+def normalize_docx_text(value: Any) -> str:
+    return " ".join(str(value or "").split())
 
 
 def as_decimal(value: Any) -> Decimal:
@@ -336,6 +323,147 @@ def money_ru(value: Any) -> str:
 
 def money_int(value: Any) -> str:
     return str(int(round(float(as_decimal(value)))))
+
+
+def money_with_words_ru(value: Any) -> str:
+    amount = as_decimal(value).quantize(Decimal("0.01"))
+    rubles = int(amount)
+    kopecks = int((amount - Decimal(rubles)) * Decimal("100"))
+    return f"{money_ru(amount)} ({money_words_ru(rubles)} {ruble_word(rubles)} {kopecks:02d} копеек)"
+
+
+def money_words_ru(value: Any) -> str:
+    amount = int(round(float(as_decimal(value))))
+    if amount <= 0:
+        return "ноль"
+    return _number_words_ru(amount)
+
+
+def ruble_word(value: int) -> str:
+    value = abs(value) % 100
+    if 11 <= value <= 19:
+        return "рублей"
+    last = value % 10
+    if last == 1:
+        return "рубль"
+    if 2 <= last <= 4:
+        return "рубля"
+    return "рублей"
+
+
+def quantity_ru(value: Any) -> str:
+    amount = as_decimal(value)
+    if amount == amount.to_integral_value():
+        return str(int(amount))
+    return f"{amount.quantize(Decimal('0.01')):.2f}".replace(".", ",")
+
+
+def percent_ru(value: Any) -> str:
+    amount = as_decimal(value)
+    if amount == 0:
+        return "0%"
+    if amount == amount.to_integral_value():
+        return f"{int(amount)}%"
+    return f"{amount.quantize(Decimal('0.01')):.2f}".replace(".", ",") + "%"
+
+
+def _number_words_ru(number: int) -> str:
+    units_male = [
+        "",
+        "один",
+        "два",
+        "три",
+        "четыре",
+        "пять",
+        "шесть",
+        "семь",
+        "восемь",
+        "девять",
+    ]
+    units_female = [
+        "",
+        "одна",
+        "две",
+        "три",
+        "четыре",
+        "пять",
+        "шесть",
+        "семь",
+        "восемь",
+        "девять",
+    ]
+    teens = [
+        "десять",
+        "одиннадцать",
+        "двенадцать",
+        "тринадцать",
+        "четырнадцать",
+        "пятнадцать",
+        "шестнадцать",
+        "семнадцать",
+        "восемнадцать",
+        "девятнадцать",
+    ]
+    tens = [
+        "",
+        "",
+        "двадцать",
+        "тридцать",
+        "сорок",
+        "пятьдесят",
+        "шестьдесят",
+        "семьдесят",
+        "восемьдесят",
+        "девяносто",
+    ]
+    hundreds = [
+        "",
+        "сто",
+        "двести",
+        "триста",
+        "четыреста",
+        "пятьсот",
+        "шестьсот",
+        "семьсот",
+        "восемьсот",
+        "девятьсот",
+    ]
+
+    def triad_words(value: int, female: bool = False) -> list[str]:
+        words = []
+        words.append(hundreds[value // 100])
+        rest = value % 100
+        if 10 <= rest <= 19:
+            words.append(teens[rest - 10])
+        else:
+            words.append(tens[rest // 10])
+            words.append((units_female if female else units_male)[rest % 10])
+        return [word for word in words if word]
+
+    def plural(value: int, forms: tuple[str, str, str]) -> str:
+        value = abs(value) % 100
+        if 11 <= value <= 19:
+            return forms[2]
+        last = value % 10
+        if last == 1:
+            return forms[0]
+        if 2 <= last <= 4:
+            return forms[1]
+        return forms[2]
+
+    parts = []
+    millions = number // 1_000_000
+    thousands = (number // 1_000) % 1_000
+    rest = number % 1_000
+    if millions:
+        parts.extend(triad_words(millions))
+        parts.append(plural(millions, ("миллион", "миллиона", "миллионов")))
+    if thousands:
+        parts.extend(triad_words(thousands, female=True))
+        parts.append(plural(thousands, ("тысяча", "тысячи", "тысяч")))
+    if rest:
+        parts.extend(triad_words(rest))
+    return " ".join(parts)
 
 
 def _safe_filename(filename: str) -> str:

@@ -2,6 +2,17 @@ from __future__ import annotations
 
 from app.ui.qt import QApplication, QBrush, QColor, QIcon, QPainter, QPen, QPixmap, Qt, QStyle
 
+try:
+    import qtawesome as qta
+except ImportError:  # pragma: no cover - optional UI dependency fallback
+    qta = None
+
+
+ICON_COLOR = "#334155"
+ICON_DANGER = "#b42318"
+ICON_SUCCESS = "#2e7d32"
+ICON_WARNING = "#a16207"
+
 
 def standard_icon(pixmap: int):
     return QApplication.style().standardIcon(pixmap)
@@ -12,6 +23,9 @@ def set_button_icon(button, pixmap: int) -> None:
 
 
 def icon_for(pixmap: int):
+    awesome = _qtawesome_icon(pixmap)
+    if awesome is not None:
+        return awesome
     if pixmap == ICON_NEW:
         return _plus_icon()
     if pixmap == ICON_EDIT:
@@ -31,6 +45,36 @@ def icon_for(pixmap: int):
     if pixmap == ICON_CONTRACT:
         return _contract_icon()
     return standard_icon(pixmap)
+
+
+def _qtawesome_icon(pixmap: int) -> QIcon | None:
+    if qta is None:
+        return None
+
+    icons = {
+        ICON_BACK: ("fa5s.arrow-left", ICON_COLOR),
+        ICON_CONTRACT: ("fa5s.file-contract", ICON_COLOR),
+        ICON_DELETE: ("fa5s.trash-alt", ICON_DANGER),
+        ICON_EDIT: ("fa5s.pen", ICON_COLOR),
+        ICON_EXIT: ("fa5s.sign-out-alt", ICON_DANGER),
+        ICON_FOLDER: ("fa5s.folder", ICON_WARNING),
+        ICON_NEW: ("fa5s.plus", ICON_SUCCESS),
+        ICON_OPEN: ("fa5s.folder-open", ICON_COLOR),
+        ICON_PASSWORD: ("fa5s.key", ICON_WARNING),
+        ICON_PRINT: ("fa5s.print", ICON_COLOR),
+        ICON_REFRESH: ("fa5s.sync-alt", ICON_COLOR),
+        ICON_REPORTS: ("fa5s.chart-bar", ICON_COLOR),
+        ICON_SERVICE: ("fa5s.briefcase-medical", ICON_COLOR),
+        ICON_SETTINGS: ("fa5s.cog", ICON_COLOR),
+        ICON_USERS: ("fa5s.users", ICON_COLOR),
+    }
+    icon_name, color = icons.get(pixmap, ("", ""))
+    if not icon_name:
+        return None
+    try:
+        return qta.icon(icon_name, color=color)
+    except Exception:
+        return None
 
 
 def _plus_icon() -> QIcon:

@@ -24,26 +24,32 @@ class ActServicesTableModel(QAbstractTableModel):
         return len(self.HEADERS)
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
-        if not index.isValid() or role != Qt.DisplayRole:
+        if not index.isValid():
+            return None
+        if role == Qt.TextAlignmentRole:
+            return self._alignment(index.column())
+        if role != Qt.DisplayRole:
             return None
         row = self.rows[index.row()]
-        price = self._value(row, "price", Decimal("0"))
+        price = self._as_decimal(self._value(row, "price", Decimal("0")))
         count = self._value(row, "count", 0)
-        discount = self._value(row, "discount", Decimal("0"))
-        total = price * count * (1 - discount / 100)
+        discount = self._as_decimal(self._value(row, "discount", Decimal("0")))
+        total = price * Decimal(str(count or 0)) * (Decimal("1") - discount / Decimal("100"))
         values = [
             self._value(row, "current_code", "") or "",
             self._value(row, "current_name", ""),
             self._value(row, "unit", ""),
-            str(price),
+            self._format_money(price),
             str(count),
-            str(discount),
-            str(total),
+            self._format_percent(discount),
+            self._format_money(total),
             self._value(row, "comments", "") or "",
         ]
         return values[index.column()]
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole):
+        if role == Qt.TextAlignmentRole and orientation == Qt.Horizontal:
+            return self._alignment(section)
         if role != Qt.DisplayRole:
             return None
         if orientation == Qt.Horizontal:
@@ -64,3 +70,21 @@ class ActServicesTableModel(QAbstractTableModel):
         if isinstance(row, dict):
             return row.get(name, default)
         return getattr(row, name, default)
+
+    def _alignment(self, column: int):
+        if column in {0, 2, 4}:
+            return int(Qt.AlignCenter)
+        if column in {3, 5, 6}:
+            return int(Qt.AlignRight | Qt.AlignVCenter)
+        return int(Qt.AlignLeft | Qt.AlignVCenter)
+
+    def _as_decimal(self, value) -> Decimal:
+        if value is None:
+            return Decimal("0")
+        return Decimal(str(value))
+
+    def _format_money(self, value: Decimal) -> str:
+        return str(value.quantize(Decimal("0.01")))
+
+    def _format_percent(self, value: Decimal) -> str:
+        return str(value.quantize(Decimal("0.01")))

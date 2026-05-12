@@ -32,7 +32,7 @@ class ContractRepository(BaseRepository[Contract]):
     def get_with_details(self, contract_id: int, include_deleted: bool = False) -> Contract | None:
         stmt = (
             select(Contract)
-            .options(selectinload(Contract.payments), selectinload(Contract.acts))
+            .options(selectinload(Contract.payments), selectinload(Contract.acts).selectinload(Act.services))
             .where(Contract.id == contract_id)
         )
         stmt = self._exclude_deleted(stmt, include_deleted)

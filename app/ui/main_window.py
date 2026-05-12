@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from app.core.config import settings
+from app.core.paths import get_resource_path
 from app.models import User
 from app.ui.contract_details_page import ContractDetailsPage
 from app.ui.contracts_page import ContractsPage
@@ -9,7 +16,7 @@ from app.ui.icons import (
     ICON_CONTRACT,
     ICON_EXIT,
     ICON_NEW,
-    ICON_REPORTS,
+    ICON_REFRESH,
     ICON_SERVICE,
     ICON_USERS,
     icon_for,
@@ -50,14 +57,13 @@ class MainWindow(QMainWindow):
         self.med_services_page_index = self._add_page("med_services", "Справочник услуг", MedServicesPage())
         if self._has_role("admin"):
             self.users_page_index = self._add_page("users", "Пользователи", UsersPage(current_user))
-        self.reports_page_index = self._add_page("reports", "Отчеты")
 
         self.setCentralWidget(self.pages)
         self._setup_menu()
 
         self.setStatusBar(QStatusBar())
         role = getattr(current_user.role, "value", current_user.role)
-        self.statusBar().showMessage(f"{current_user.username} | {role}")
+        self.statusBar().showMessage(f"{current_user.username} | {role} | база: {settings.database_path}")
         self._set_page(self.contracts_page_index)
 
     def _add_page(self, key: str, title: str, page: QWidget | None = None) -> int:
@@ -95,17 +101,17 @@ class MainWindow(QMainWindow):
     def _setup_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Файл")
         new_contract_action = QAction(icon_for(ICON_CONTRACT), "Новый договор", self)
+        new_contract_action.setShortcut("Ctrl+N")
         new_contract_action.triggered.connect(self.create_contract)
         file_menu.addAction(new_contract_action)
+        refresh_action = QAction(icon_for(ICON_REFRESH), "Обновить список", self)
+        refresh_action.setShortcut("F5")
+        refresh_action.triggered.connect(self.refresh_contracts)
+        file_menu.addAction(refresh_action)
         file_menu.addSeparator()
         exit_action = QAction(icon_for(ICON_EXIT), "Выход", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
-
-        reports_menu = self.menuBar().addMenu("Отчеты")
-        reports_action = QAction(icon_for(ICON_REPORTS), "Отчеты", self)
-        reports_action.triggered.connect(lambda: self._set_page(self.reports_page_index))
-        reports_menu.addAction(reports_action)
 
         settings_menu = self.menuBar().addMenu("Настройки")
         users_index = self.page_indexes.get("users")
@@ -117,6 +123,13 @@ class MainWindow(QMainWindow):
         med_services_action = QAction(icon_for(ICON_SERVICE), "Справочник услуг", self)
         med_services_action.triggered.connect(lambda: self._set_page(self.med_services_page_index))
         settings_menu.addAction(med_services_action)
+        settings_menu.addSeparator()
+        data_dir_action = QAction("Папка данных", self)
+        data_dir_action.triggered.connect(lambda: self._open_path(settings.data_dir))
+        settings_menu.addAction(data_dir_action)
+        templates_action = QAction("Шаблоны документов", self)
+        templates_action.triggered.connect(lambda: self._open_path(get_resource_path("app", "templates", "docx")))
+        settings_menu.addAction(templates_action)
 
     def _set_page(self, index: int) -> None:
         if index >= 0:
@@ -127,6 +140,11 @@ class MainWindow(QMainWindow):
             self.show_contracts_page()
         self._set_page(self.contracts_page_index)
         self.contracts_page.create_contract()
+
+    def refresh_contracts(self) -> None:
+        self.show_contracts_page()
+        self.contracts_page.reload()
+        self.statusBar().showMessage(f"{self.current_user.username} | список обновлён | база: {settings.database_path}")
 
     def open_contract_details(self, contract_id: int) -> None:
         self.last_contract_id = contract_id
@@ -159,6 +177,16 @@ class MainWindow(QMainWindow):
         self.pages.removeWidget(self.details_page)
         self.details_page.deleteLater()
         self.details_page = None
+
+    def _open_path(self, path: Path) -> None:
+        path.mkdir(parents=True, exist_ok=True)
+        if sys.platform.startswith("win"):
+            os.startfile(path)  # type: ignore[attr-defined]
+            return
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+            return
+        subprocess.Popen(["xdg-open", str(path)])
 
     def _has_role(self, role: str) -> bool:
         current_role = getattr(self.current_user.role, "value", self.current_user.role)
