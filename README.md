@@ -18,6 +18,8 @@ Packaging: PyInstaller
 
 ## Install
 
+Подробная инструкция по созданию Python 3.8 окружения: [`ENVIRONMENT_SETUP.md`](ENVIRONMENT_SETUP.md).
+
 Target Windows/Python 3.8:
 
 ```bat
@@ -64,5 +66,4 @@ RD4_DATA_DIR=.rd4 .venv/bin/python -m app.services.smoke
 
 ## Build
 
-See [`packaging/README.md`](packaging/README.md).
-
+See [`WINDOWS7_BUILD_GUIDE.md`](WINDOWS7_BUILD_GUIDE.md) and [`packaging/README.md`](packaging/README.md).

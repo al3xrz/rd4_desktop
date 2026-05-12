@@ -28,6 +28,8 @@ Python 3.8.x
 
 ## 2. Создать виртуальное окружение
 
+Подробная инструкция по окружению и альтернативный вариант через `uv`: [`ENVIRONMENT_SETUP.md`](ENVIRONMENT_SETUP.md).
+
 Из корня проекта:
 
 ```bat
@@ -80,6 +82,21 @@ dist\RD4\RD4.exe
 
 Это onedir-сборка: рядом с `RD4.exe` лежат библиотеки, ресурсы, миграции и bundled-шаблоны.
 
+Проверка Python DLL после сборки:
+
+```bat
+dir dist\RD4\python38.dll
+```
+
+Если файл отсутствует, проверьте, что сборка идёт из обычного Python 3.8, а не из Store/embedded-инсталляции:
+
+```bat
+where python
+python -c "import sys, pathlib; print(sys.executable); print(sys.base_prefix); print((pathlib.Path(sys.base_prefix) / 'python38.dll').exists())"
+```
+
+В официальной установке Python 3.8 файл `python38.dll` должен существовать в каталоге `sys.base_prefix`. `packaging\rd4.spec` дополнительно пытается явно добавить этот DLL в `dist\RD4`.
+
 ## 6. Что попадает в bundle
 
 PyInstaller spec включает:
@@ -124,6 +141,8 @@ dist\RD4\app\templates\docx\
 dist\RD4\RD4.exe
 ```
 
+Запускайте и переносите именно всю папку `dist\RD4`, а не один `RD4.exe`. В onedir-сборке `RD4.exe` зависит от файлов рядом с ним, включая `python38.dll`.
+
 Проверьте:
 
 ```text
@@ -137,6 +156,15 @@ dist\RD4\RD4.exe
 [ ] после перезапуска данные сохраняются
 [ ] %APPDATA%\RD4\rd4.db существует
 [ ] %APPDATA%\RD4\logs\rd4.log существует
+```
+
+Если при запуске появляется ошибка `python38.dll was not found`, проверьте:
+
+```text
+[ ] запускается именно dist\RD4\RD4.exe, а не скопированный отдельно RD4.exe
+[ ] рядом с RD4.exe лежит python38.dll
+[ ] рядом с RD4.exe лежат PySide2/Qt DLL и остальные файлы bundle
+[ ] сборка выполнена командой python -m PyInstaller packaging\rd4.spec --noconfirm из активного .venv
 ```
 
 ## 9. Проверка на Windows 7
@@ -161,3 +189,5 @@ RD4_DATA_DIR=.rd4_bundle_smoke dist/RD4/RD4
 ```
 
 Для GUI-запуска в Linux может понадобиться доступ к X11/Wayland и Qt platform plugins.
+
+Если проект лежит в пути с кириллицей, PyInstaller 4.10 на Linux может не найти PySide2 plugins. Для локальной smoke-сборки используйте ASCII-путь, например `/tmp/rd4_build`. На Windows build VM также лучше держать исходники в простом пути вроде `C:\rd4_desktop`.

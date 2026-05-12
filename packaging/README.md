@@ -11,6 +11,8 @@ PySide2
 PyInstaller
 ```
 
+Подробные шаги создания `.venv`: [`../ENVIRONMENT_SETUP.md`](../ENVIRONMENT_SETUP.md).
+
 ## Сборка
 
 Из корня репозитория:
@@ -25,11 +27,21 @@ pyinstaller packaging\rd4.spec
 
 `requirements.txt` предназначен именно для целевого Python 3.8.x. Для разработки на более новом Linux/Python окружении используйте `requirements-dev.txt`; такой build не является проверкой Windows 7.
 
+Не устанавливайте `requirements.txt` и `requirements-dev.txt` одновременно в одну среду: они требуют разные major-версии PyInstaller.
+
 Результат:
 
 ```text
 dist\RD4\RD4.exe
 ```
+
+Проверка обязательного Python DLL:
+
+```bat
+dir dist\RD4\python38.dll
+```
+
+Переносите и запускайте всю папку `dist\RD4`, а не отдельный `RD4.exe`.
 
 ## Что включается в bundle
 

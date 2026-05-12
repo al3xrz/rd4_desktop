@@ -8,6 +8,7 @@
 [ ] pip upgraded
 [ ] Visual C++ runtime available if needed
 [ ] Repository copied to VM
+[ ] Environment prepared using ENVIRONMENT_SETUP.md
 ```
 
 ## Install
@@ -17,6 +18,13 @@ python -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
+```
+
+Expected:
+
+```text
+[ ] python --version reports Python 3.8.x
+[ ] requirements-dev.txt was not installed into this build venv
 ```
 
 ## Development run
@@ -77,6 +85,7 @@ Expected:
 
 ```text
 [ ] dist\RD4\RD4.exe exists
+[ ] dist\RD4\python38.dll exists
 [ ] dist\RD4 contains bundled templates
 [ ] dist\RD4 contains migrations
 [ ] RD4.exe starts by double click
@@ -94,3 +103,21 @@ Expected:
 [ ] AppData write permissions work
 ```
 
+## Missing python38.dll
+
+If Windows reports that `python38.dll` is missing:
+
+```text
+[ ] run dist\RD4\RD4.exe from the full dist\RD4 folder
+[ ] do not copy only RD4.exe to another folder
+[ ] verify python38.dll exists in dist\RD4
+[ ] verify python38.dll exists in the base Python 3.8 installation
+```
+
+Diagnostic commands:
+
+```bat
+dir dist\RD4\python38.dll
+where python
+python -c "import sys, pathlib; print(sys.executable); print(sys.base_prefix); print((pathlib.Path(sys.base_prefix) / 'python38.dll').exists())"
+```

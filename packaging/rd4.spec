@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
 from pathlib import Path
 
 
@@ -14,11 +15,25 @@ datas = [
     (str(ROOT / "app" / "resources"), "app/resources"),
 ]
 
+python_binaries = []
+if sys.platform.startswith("win"):
+    python_dll_name = f"python{sys.version_info.major}{sys.version_info.minor}.dll"
+    python_dll_candidates = [
+        Path(sys.base_prefix) / python_dll_name,
+        Path(sys.exec_prefix) / python_dll_name,
+        Path(sys.executable).resolve().parent / python_dll_name,
+        Path(sys.executable).resolve().parent.parent / python_dll_name,
+    ]
+    for python_dll in python_dll_candidates:
+        if python_dll.exists():
+            python_binaries.append((str(python_dll), "."))
+            break
+
 
 a = Analysis(
     [str(ROOT / "app" / "main.py")],
     pathex=[str(ROOT)],
-    binaries=[],
+    binaries=python_binaries,
     datas=datas,
     hiddenimports=[
         "app.ui.application",
