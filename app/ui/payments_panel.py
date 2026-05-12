@@ -3,10 +3,11 @@ from __future__ import annotations
 from app.models import Payment, User
 from app.services import PaymentService
 from app.services.exceptions import DomainError
-from app.ui.icons import ICON_DELETE, ICON_EDIT, ICON_NEW, ICON_REFRESH, set_button_icon
+from app.ui.icons import ICON_DELETE, ICON_EDIT, ICON_NEW, ICON_REFUND, set_button_icon
 from app.ui.payment_dialog import PaymentDialog
 from app.ui.payments_table_model import PaymentsTableModel
-from app.ui.qt import QHBoxLayout, QHeaderView, QMessageBox, QPushButton, QTableView, QVBoxLayout, QWidget
+from app.ui.qt import QMessageBox, QHeaderView, QTableView, QVBoxLayout, QWidget
+from app.ui.toolbars import make_toolbar, make_toolbar_button
 from app.ui.unpost_payment_dialog import UnpostPaymentDialog
 
 
@@ -25,12 +26,12 @@ class PaymentsPanel(QWidget):
         self.on_changed = on_changed
         self.model = PaymentsTableModel()
 
-        self.add_payment_button = QPushButton("Добавить оплату")
-        self.add_refund_button = QPushButton("Добавить возврат")
-        self.edit_button = QPushButton("Редактировать")
-        self.unpost_button = QPushButton("Распровести")
+        self.add_payment_button = self._toolbar_button("Оплата", "Добавить оплату")
+        self.add_refund_button = self._toolbar_button("Возврат", "Добавить возврат")
+        self.edit_button = self._toolbar_button("Редактировать", "Редактировать выбранный платеж")
+        self.unpost_button = self._toolbar_button("Распровести", "Распровести выбранный платеж")
         set_button_icon(self.add_payment_button, ICON_NEW)
-        set_button_icon(self.add_refund_button, ICON_REFRESH)
+        set_button_icon(self.add_refund_button, ICON_REFUND)
         set_button_icon(self.edit_button, ICON_EDIT)
         set_button_icon(self.unpost_button, ICON_DELETE)
 
@@ -39,12 +40,12 @@ class PaymentsPanel(QWidget):
         self.edit_button.clicked.connect(self._edit_payment)
         self.unpost_button.clicked.connect(self._unpost_payment)
 
-        toolbar = QHBoxLayout()
+        toolbar = make_toolbar()
         toolbar.addWidget(self.add_payment_button)
         toolbar.addWidget(self.add_refund_button)
+        toolbar.addSeparator()
         toolbar.addWidget(self.edit_button)
         toolbar.addWidget(self.unpost_button)
-        toolbar.addStretch()
 
         self.table = QTableView()
         self.table.setModel(self.model)
@@ -60,11 +61,14 @@ class PaymentsPanel(QWidget):
         self.table.setColumnWidth(4, 240)
 
         layout = QVBoxLayout()
-        layout.addLayout(toolbar)
+        layout.addWidget(toolbar)
         layout.addWidget(self.table)
         self.setLayout(layout)
 
         self.reload()
+
+    def _toolbar_button(self, text: str, tooltip: str):
+        return make_toolbar_button(text, tooltip)
 
     def reload(self) -> None:
         self.model.set_payments(self.payment_service.list_payments(self.contract_id))

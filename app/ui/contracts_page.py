@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from app.models import Contract, User
-from app.services import ContractService
+from app.services import ContractService, DocxService
 from app.services.exceptions import DomainError
 from app.ui.contract_dialog import ContractDialog
 from app.ui.contracts_table_model import ContractsTableModel
@@ -13,10 +13,13 @@ from app.ui.icons import (
     ICON_EDIT,
     ICON_NEW,
     ICON_OPEN,
+    ICON_PRINT,
     ICON_REFRESH,
+    ICON_RESET,
     icon_for,
     set_button_icon,
 )
+from app.ui.toolbars import make_toolbar, make_toolbar_button
 from app.ui.qt import (
     QAction,
     QGridLayout,
@@ -31,7 +34,6 @@ from app.ui.qt import (
     QLineEdit,
     QMenu,
     QMessageBox,
-    QPushButton,
     QSizePolicy,
     QShortcut,
     QSortFilterProxyModel,
@@ -68,10 +70,17 @@ class ContractsPage(QWidget):
     VISIBILITY_ALL = "Все"
     VISIBILITY_DELETED = "Удаленные"
 
-    def __init__(self, current_user: User, contract_service: ContractService | None = None, on_open_contract=None) -> None:
+    def __init__(
+        self,
+        current_user: User,
+        contract_service: ContractService | None = None,
+        docx_service: DocxService | None = None,
+        on_open_contract=None,
+    ) -> None:
         super().__init__()
         self.current_user = current_user
         self.contract_service = contract_service or ContractService()
+        self.docx_service = docx_service or DocxService()
         self.on_open_contract = on_open_contract
         self.contracts: list[Contract] = []
         self.summaries: dict[int, dict] = {}
@@ -101,20 +110,18 @@ class ContractsPage(QWidget):
             self.PERIOD_CUSTOM,
         ]:
             self.period_input.addItem(period, period)
+        self._make_compact_combo(self.period_input, 96)
         self.period_input.currentIndexChanged.connect(self._period_changed)
 
         self.date_from_input = self._date_filter_input()
         self.date_to_input = self._date_filter_input()
-        self.period_input.setMinimumWidth(130)
-        self.period_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.date_from_input.dateTimeChanged.connect(self._date_filter_changed)
         self.date_to_input.dateTimeChanged.connect(self._date_filter_changed)
 
         self.payment_type_input = QComboBox()
         for payment_type in [self.PAYMENT_ALL, self.PAYMENT_PAID, self.PAYMENT_INSURANCE, self.PAYMENT_UNSET]:
             self.payment_type_input.addItem(payment_type, payment_type)
-        self.payment_type_input.setMinimumWidth(88)
-        self.payment_type_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._make_compact_combo(self.payment_type_input, 76)
         self.payment_type_input.currentIndexChanged.connect(self._apply_filter)
 
         self.balance_status_input = QComboBox()
@@ -126,41 +133,29 @@ class ContractsPage(QWidget):
             self.BALANCE_NO_ACTS,
         ]:
             self.balance_status_input.addItem(balance_status, balance_status)
-        self.balance_status_input.setMinimumWidth(100)
-        self.balance_status_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._make_compact_combo(self.balance_status_input, 82)
         self.balance_status_input.currentIndexChanged.connect(self._apply_filter)
 
         self.visibility_input = QComboBox()
         for visibility in [self.VISIBILITY_ACTIVE, self.VISIBILITY_ALL, self.VISIBILITY_DELETED]:
             self.visibility_input.addItem(visibility, visibility)
-        self.visibility_input.setMinimumWidth(105)
-        self.visibility_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._make_compact_combo(self.visibility_input, 90)
         self.visibility_input.currentIndexChanged.connect(lambda *_: self.reload())
 
-        self.create_button = QPushButton("Создать")
-        self.clone_button = QPushButton("На основе")
-        self.edit_button = QPushButton("Редактировать")
-        self.open_button = QPushButton("Открыть")
-        self.delete_button = QPushButton("Удалить")
-        self.refresh_button = QPushButton("Обновить")
-        self.reset_filters_button = QPushButton("Сбросить")
+        self.create_button = self._toolbar_button("Создать", "Создать новый договор")
+        self.clone_button = self._toolbar_button("На основе", "Создать договор на основе выбранного")
+        self.edit_button = self._toolbar_button("Редактировать", "Редактировать выбранный договор")
+        self.open_button = self._toolbar_button("Открыть", "Открыть карточку выбранного договора")
+        self.delete_button = self._toolbar_button("Удалить", "Удалить выбранный договор")
+        self.refresh_button = self._toolbar_button("Обновить", "Обновить список договоров")
+        self.reset_filters_button = self._toolbar_button("Сбросить фильтры", "Сбросить все фильтры списка")
         set_button_icon(self.create_button, ICON_NEW)
         set_button_icon(self.clone_button, ICON_CONTRACT)
         set_button_icon(self.edit_button, ICON_EDIT)
         set_button_icon(self.open_button, ICON_OPEN)
         set_button_icon(self.delete_button, ICON_DELETE)
         set_button_icon(self.refresh_button, ICON_REFRESH)
-        set_button_icon(self.reset_filters_button, ICON_REFRESH)
-        self.reset_filters_button.setStyleSheet(
-            "QPushButton {"
-            "background: #ffffff;"
-            "border: 1px solid #cbd5e1;"
-            "border-radius: 4px;"
-            "color: #334155;"
-            "padding: 4px 10px;"
-            "}"
-            "QPushButton:hover { background: #f8fafc; }"
-        )
+        set_button_icon(self.reset_filters_button, ICON_RESET)
 
         self.create_button.clicked.connect(self.create_contract)
         self.clone_button.clicked.connect(self._clone_contract)
@@ -170,55 +165,68 @@ class ContractsPage(QWidget):
         self.refresh_button.clicked.connect(self.reload)
         self.reset_filters_button.clicked.connect(self._reset_filters)
 
-        toolbar = QHBoxLayout()
-        toolbar.addWidget(self.create_button)
-        toolbar.addWidget(self.clone_button)
-        toolbar.addWidget(self.edit_button)
-        toolbar.addWidget(self.open_button)
-        toolbar.addWidget(self.delete_button)
+        toolbar = make_toolbar()
+        for button in [self.create_button, self.clone_button, self.edit_button, self.open_button, self.delete_button]:
+            toolbar.addWidget(button)
+        toolbar.addSeparator()
         toolbar.addWidget(self.refresh_button)
-        toolbar.addStretch()
+        toolbar.addWidget(self.reset_filters_button)
 
         self.period_group = self._filter_group("Период")
-        period_layout = QGridLayout(self.period_group)
-        period_layout.setContentsMargins(10, 8, 10, 8)
-        period_layout.setHorizontalSpacing(8)
-        period_layout.setVerticalSpacing(6)
-        period_layout.addWidget(QLabel("Тип"), 0, 0)
-        period_layout.addWidget(self.period_input, 0, 1)
-        period_layout.addWidget(QLabel("с"), 0, 2)
-        period_layout.addWidget(self.date_from_input, 0, 3)
-        period_layout.addWidget(QLabel("по"), 0, 4)
-        period_layout.addWidget(self.date_to_input, 0, 5)
-        period_layout.setColumnStretch(1, 2)
-        period_layout.setColumnStretch(3, 1)
-        period_layout.setColumnStretch(5, 1)
+        self.period_layout = QGridLayout(self.period_group)
+        self.period_layout.setContentsMargins(8, 12, 8, 6)
+        self.period_layout.setHorizontalSpacing(5)
+        self.period_layout.setVerticalSpacing(4)
+        self.period_type_label = QLabel("Тип")
+        self.period_from_label = QLabel("с")
+        self.period_to_label = QLabel("по")
+        self.period_from_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.period_to_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.period_layout.addWidget(self.period_type_label, 0, 0)
+        self.period_layout.addWidget(self.period_input, 0, 1)
+        self.period_layout.addWidget(self.period_from_label, 0, 2)
+        self.period_layout.addWidget(self.date_from_input, 0, 3)
+        self.period_layout.addWidget(self.period_to_label, 0, 4)
+        self.period_layout.addWidget(self.date_to_input, 0, 5)
+        self.period_layout.setColumnStretch(1, 1)
+        self.period_layout.setColumnStretch(3, 1)
+        self.period_layout.setColumnStretch(5, 1)
 
         self.params_group = self._filter_group("Фильтры")
-        params_layout = QGridLayout(self.params_group)
-        params_layout.setContentsMargins(10, 8, 10, 8)
-        params_layout.setHorizontalSpacing(8)
-        params_layout.setVerticalSpacing(6)
-        params_layout.addWidget(QLabel("Оплата"), 0, 0)
-        params_layout.addWidget(self.payment_type_input, 0, 1)
-        params_layout.addWidget(QLabel("Баланс"), 0, 2)
-        params_layout.addWidget(self.balance_status_input, 0, 3)
-        params_layout.addWidget(QLabel("Видимость"), 0, 4)
-        params_layout.addWidget(self.visibility_input, 0, 5)
-        params_layout.setColumnStretch(1, 1)
-        params_layout.setColumnStretch(3, 1)
-        params_layout.setColumnStretch(5, 1)
+        self.params_layout = QGridLayout(self.params_group)
+        self.params_layout.setContentsMargins(8, 12, 8, 6)
+        self.params_layout.setHorizontalSpacing(5)
+        self.params_layout.setVerticalSpacing(4)
+        self.payment_label = QLabel("Оплата")
+        self.balance_label = QLabel("Баланс")
+        self.visibility_label = QLabel("Видимость")
+        self.params_layout.addWidget(self.payment_label, 0, 0)
+        self.params_layout.addWidget(self.payment_type_input, 0, 1)
+        self.params_layout.addWidget(self.balance_label, 0, 2)
+        self.params_layout.addWidget(self.balance_status_input, 0, 3)
+        self.params_layout.addWidget(self.visibility_label, 0, 4)
+        self.params_layout.addWidget(self.visibility_input, 0, 5)
+        self.params_layout.setColumnStretch(1, 1)
+        self.params_layout.setColumnStretch(3, 1)
+        self.params_layout.setColumnStretch(5, 1)
+
+        self.compact_filters_group = self._filter_group("Период и фильтры")
+        self.compact_filters_layout = QGridLayout(self.compact_filters_group)
+        self.compact_filters_layout.setContentsMargins(8, 12, 8, 6)
+        self.compact_filters_layout.setHorizontalSpacing(5)
+        self.compact_filters_layout.setVerticalSpacing(4)
 
         filters_panel = QWidget()
+        filters_panel.setMinimumWidth(0)
         filters_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.filters_layout = QGridLayout(filters_panel)
         self.filters_layout.setContentsMargins(0, 0, 0, 0)
-        self.filters_layout.setHorizontalSpacing(8)
-        self.filters_layout.setVerticalSpacing(6)
-        self.reset_filters_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.filters_layout.setHorizontalSpacing(6)
+        self.filters_layout.setVerticalSpacing(4)
         self._set_filters_layout(stacked=False)
 
         self.table = QTableView()
+        self.table.setMinimumWidth(0)
         self.table.setModel(self.proxy_model)
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setSelectionMode(QTableView.SingleSelection)
@@ -229,6 +237,7 @@ class ContractsPage(QWidget):
         self.table.customContextMenuRequested.connect(self._open_context_menu)
         self.table.selectionModel().selectionChanged.connect(self._update_selection)
         header = self.table.horizontalHeader()
+        header.setMinimumSectionSize(36)
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
         header.setSortIndicatorShown(True)
@@ -258,7 +267,7 @@ class ContractsPage(QWidget):
 
         layout = QVBoxLayout()
         layout.addLayout(header)
-        layout.addLayout(toolbar)
+        layout.addWidget(toolbar)
         layout.addWidget(filters_panel)
         layout.addWidget(self.search_input)
         layout.addWidget(self.table)
@@ -396,6 +405,26 @@ class ContractsPage(QWidget):
             return
         QMessageBox.information(self, "Договор", f"{contract.contract_number}\n{contract.patient_name}")
 
+    def _print_contract(self) -> None:
+        """Render and open the selected contract document from the registry."""
+        contract = self._selected_contract()
+        if contract is None:
+            self._show_error("Выберите договор")
+            return
+        if contract.deleted:
+            self._show_error("Удаленный договор нельзя распечатать")
+            return
+
+        try:
+            actual_contract = self.contract_service.get_contract(contract.id)
+            if actual_contract.service_insurance:
+                path = self.docx_service.render_foms_contract(contract.id)
+            else:
+                path = self.docx_service.render_paid_contract(contract.id)
+            self.docx_service.open_document(path)
+        except DomainError as exc:
+            self._show_error(str(exc))
+
     def _delete_contract(self) -> None:
         """Soft-delete the selected contract after user confirmation."""
         contract = self._selected_contract()
@@ -437,12 +466,15 @@ class ContractsPage(QWidget):
         menu.addSeparator()
         open_action = menu.addAction(icon_for(ICON_OPEN), "Открыть")
         edit_action = menu.addAction(icon_for(ICON_EDIT), "Редактировать")
+        print_action = menu.addAction(icon_for(ICON_PRINT), "Печать договора")
+        menu.addSeparator()
         delete_action = menu.addAction(icon_for(ICON_DELETE), "Удалить")
         has_contract = contract is not None
         is_deleted = bool(contract and contract.deleted)
         clone_action.setEnabled(has_contract)
         open_action.setEnabled(has_contract and not is_deleted)
         edit_action.setEnabled(has_contract and not is_deleted)
+        print_action.setEnabled(has_contract and not is_deleted)
         delete_action.setEnabled(has_contract and not is_deleted)
 
         action = menu.exec_(self.table.viewport().mapToGlobal(position))
@@ -456,6 +488,8 @@ class ContractsPage(QWidget):
             self._open_contract()
         elif action == edit_action:
             self._edit_contract()
+        elif action == print_action:
+            self._print_contract()
         elif action == delete_action:
             self._delete_contract()
 
@@ -599,37 +633,123 @@ class ContractsPage(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self._set_filters_layout(stacked=self.width() < 980)
+        self._set_filters_layout(stacked=self.width() < 1040)
 
     def _set_filters_layout(self, stacked: bool) -> None:
-        if self._filters_stacked == stacked and self.filters_layout.indexOf(self.period_group) >= 0:
+        target = self.compact_filters_group if stacked else self.period_group
+        if self._filters_stacked == stacked and self.filters_layout.indexOf(target) >= 0:
             return
 
-        for widget in [self.period_group, self.params_group, self.reset_filters_button]:
-            self.filters_layout.removeWidget(widget)
+        for group in [self.period_group, self.params_group, self.compact_filters_group]:
+            self.filters_layout.removeWidget(group)
+            group.hide()
 
         if stacked:
-            self.filters_layout.addWidget(self.period_group, 0, 0)
-            self.filters_layout.addWidget(self.params_group, 1, 0)
-            self.filters_layout.addWidget(self.reset_filters_button, 0, 1, 2, 1)
+            self._set_compact_filter_controls()
+            self.compact_filters_group.show()
+            self.filters_layout.addWidget(self.compact_filters_group, 0, 0)
             self.filters_layout.setColumnStretch(0, 1)
             self.filters_layout.setColumnStretch(1, 0)
             self.filters_layout.setRowStretch(0, 1)
-            self.filters_layout.setRowStretch(1, 1)
+            self.filters_layout.setRowStretch(1, 0)
         else:
+            self._set_separate_filter_controls()
+            self.period_group.show()
+            self.params_group.show()
             self.filters_layout.addWidget(self.period_group, 0, 0)
             self.filters_layout.addWidget(self.params_group, 0, 1)
-            self.filters_layout.addWidget(self.reset_filters_button, 0, 2)
-            self.filters_layout.setColumnStretch(0, 3)
-            self.filters_layout.setColumnStretch(1, 2)
+            self.filters_layout.setColumnStretch(0, 1)
+            self.filters_layout.setColumnStretch(1, 1)
             self.filters_layout.setColumnStretch(2, 0)
             self.filters_layout.setRowStretch(0, 1)
             self.filters_layout.setRowStretch(1, 0)
 
         self._filters_stacked = stacked
 
+    def _remove_filter_controls_from_layouts(self) -> None:
+        widgets = [
+            self.period_type_label,
+            self.period_input,
+            self.period_from_label,
+            self.date_from_input,
+            self.period_to_label,
+            self.date_to_input,
+            self.payment_label,
+            self.payment_type_input,
+            self.balance_label,
+            self.balance_status_input,
+            self.visibility_label,
+            self.visibility_input,
+        ]
+        for layout in [self.period_layout, self.params_layout, self.compact_filters_layout]:
+            for widget in widgets:
+                layout.removeWidget(widget)
+
+    def _set_compact_filter_controls(self) -> None:
+        self._remove_filter_controls_from_layouts()
+        self.period_from_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.period_to_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.compact_filters_layout.addWidget(self.period_type_label, 0, 0)
+        self.compact_filters_layout.addWidget(self.period_input, 0, 1)
+        self.compact_filters_layout.addWidget(self.period_from_label, 0, 2)
+        self.compact_filters_layout.addWidget(self.date_from_input, 0, 3)
+        self.compact_filters_layout.addWidget(self.period_to_label, 0, 4)
+        self.compact_filters_layout.addWidget(self.date_to_input, 0, 5)
+        self.compact_filters_layout.addWidget(self.payment_label, 1, 0)
+        self.compact_filters_layout.addWidget(self.payment_type_input, 1, 1)
+        self.compact_filters_layout.addWidget(self.balance_label, 1, 2)
+        self.compact_filters_layout.addWidget(self.balance_status_input, 1, 3)
+        self.compact_filters_layout.addWidget(self.visibility_label, 1, 4)
+        self.compact_filters_layout.addWidget(self.visibility_input, 1, 5)
+        self._sync_stacked_filter_columns()
+
+    def _set_separate_filter_controls(self) -> None:
+        self._remove_filter_controls_from_layouts()
+        self.period_from_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.period_to_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.period_layout.addWidget(self.period_type_label, 0, 0)
+        self.period_layout.addWidget(self.period_input, 0, 1)
+        self.period_layout.addWidget(self.period_from_label, 0, 2)
+        self.period_layout.addWidget(self.date_from_input, 0, 3)
+        self.period_layout.addWidget(self.period_to_label, 0, 4)
+        self.period_layout.addWidget(self.date_to_input, 0, 5)
+        self.params_layout.addWidget(self.payment_label, 0, 0)
+        self.params_layout.addWidget(self.payment_type_input, 0, 1)
+        self.params_layout.addWidget(self.balance_label, 0, 2)
+        self.params_layout.addWidget(self.balance_status_input, 0, 3)
+        self.params_layout.addWidget(self.visibility_label, 0, 4)
+        self.params_layout.addWidget(self.visibility_input, 0, 5)
+
+    def _toolbar_button(self, text: str, tooltip: str):
+        return make_toolbar_button(text, tooltip)
+
+    def _sync_stacked_filter_columns(self) -> None:
+        label_pairs = [
+            (self.period_type_label, self.payment_label),
+            (self.period_from_label, self.balance_label),
+            (self.period_to_label, self.visibility_label),
+        ]
+        for column, pair in zip([0, 2, 4], label_pairs):
+            width = max(label.sizeHint().width() for label in pair)
+            for label in pair:
+                label.setMinimumWidth(width)
+            self.period_layout.setColumnMinimumWidth(column, width)
+            self.params_layout.setColumnMinimumWidth(column, width)
+            self.compact_filters_layout.setColumnMinimumWidth(column, width)
+
+        field_widths = {
+            1: max(self.period_input.minimumWidth(), self.payment_type_input.minimumWidth()),
+            3: max(self.date_from_input.minimumWidth(), self.balance_status_input.minimumWidth()),
+            5: max(self.date_to_input.minimumWidth(), self.visibility_input.minimumWidth()),
+        }
+        for column, width in field_widths.items():
+            self.period_layout.setColumnMinimumWidth(column, width)
+            self.params_layout.setColumnMinimumWidth(column, width)
+            self.compact_filters_layout.setColumnMinimumWidth(column, width)
+
     def _filter_group(self, title: str) -> QGroupBox:
         group = QGroupBox(title)
+        group.setMinimumWidth(0)
         group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         group.setStyleSheet(
             "QGroupBox {"
@@ -638,20 +758,33 @@ class ContractsPage(QWidget):
             "border-radius: 6px;"
             "color: #1f4f82;"
             "font-weight: 600;"
-            "margin-top: 10px;"
+            "margin-top: 8px;"
             "}"
-            "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 7px; padding: 0 3px; }"
             "QLabel { border: none; background: transparent; color: #475569; }"
-            "QComboBox, QDateTimeEdit { background: #ffffff; }"
+            "QComboBox, QDateTimeEdit { background: #ffffff; selection-background-color: #2563eb; selection-color: #ffffff; }"
+            "QComboBox QAbstractItemView {"
+            "background: #ffffff;"
+            "color: #111827;"
+            "selection-background-color: #2563eb;"
+            "selection-color: #ffffff;"
+            "outline: 0;"
+            "}"
         )
         return group
+
+    def _make_compact_combo(self, combo: QComboBox, minimum_width: int) -> None:
+        combo.setMinimumWidth(minimum_width)
+        combo.setMinimumContentsLength(0)
+        combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def _date_filter_input(self) -> QDateTimeEdit:
         """Create a compact date-time control used by registry period filters."""
         widget = QDateTimeEdit()
         widget.setCalendarPopup(True)
         widget.setDisplayFormat("dd.MM.yyyy")
-        widget.setMinimumWidth(104)
+        widget.setMinimumWidth(88)
         widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         return widget
 

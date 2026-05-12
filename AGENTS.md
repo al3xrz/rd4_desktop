@@ -35,6 +35,12 @@ services -> ui
 
 Keep `ARCHITECTURE.md` in the repository root up to date when changing application structure, dependency direction, startup flow, database/migration rules, packaging, or major UI/service/model flows.
 
+Keep `docs/` up to date when changing project behavior:
+
+- `docs/user/` — user-facing workflows and UI behavior.
+- `docs/admin/` — installation, data paths, database backend, backups, packaging, maintenance.
+- `docs/developer/` — architecture, dependencies, migrations, validation, contributor workflow.
+
 ## Transaction rules
 
 One business operation equals one service-level transaction.

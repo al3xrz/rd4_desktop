@@ -48,8 +48,10 @@ class MainWindow(QMainWindow):
         self.page_indexes: dict[str, int] = {}
         self.setWindowTitle("Роддом №4")
         self.resize(1100, 720)
+        self.setMinimumWidth(640)
 
         self.pages = QStackedWidget()
+        self.pages.setMinimumWidth(0)
         self.pages.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.contracts_page = ContractsPage(current_user, on_open_contract=self.open_contract_details)

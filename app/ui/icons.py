@@ -63,6 +63,8 @@ def _qtawesome_icon(pixmap: int) -> QIcon | None:
         ICON_PASSWORD: ("fa5s.key", ICON_WARNING),
         ICON_PRINT: ("fa5s.print", ICON_COLOR),
         ICON_REFRESH: ("fa5s.sync-alt", ICON_COLOR),
+        ICON_RESET: ("fa5s.eraser", ICON_COLOR),
+        ICON_REFUND: ("fa5s.undo-alt", ICON_WARNING),
         ICON_REPORTS: ("fa5s.chart-bar", ICON_COLOR),
         ICON_SERVICE: ("fa5s.briefcase-medical", ICON_COLOR),
         ICON_SETTINGS: ("fa5s.cog", ICON_COLOR),
@@ -232,6 +234,8 @@ ICON_OPEN = QStyle.SP_DialogOpenButton
 ICON_PASSWORD = -9
 ICON_PRINT = QStyle.SP_DialogSaveButton
 ICON_REFRESH = QStyle.SP_BrowserReload
+ICON_RESET = QStyle.SP_DialogResetButton
+ICON_REFUND = -10
 ICON_REPORTS = -6
 ICON_SERVICE = -4
 ICON_SETTINGS = QStyle.SP_FileDialogListView

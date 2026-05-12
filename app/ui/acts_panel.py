@@ -6,15 +6,13 @@ from app.services.exceptions import DomainError
 from app.ui.act_dialog import ActDialog
 from app.ui.acts_table_model import ActsTableModel
 from app.ui.icons import ICON_DELETE, ICON_NEW, ICON_OPEN, ICON_PRINT, set_button_icon
+from app.ui.toolbars import make_toolbar, make_toolbar_button
 from app.ui.qt import (
     QAction,
-    QGroupBox,
-    QHBoxLayout,
     QHeaderView,
     QKeySequence,
     QLabel,
     QMessageBox,
-    QPushButton,
     QShortcut,
     QTableView,
     QVBoxLayout,
@@ -42,12 +40,12 @@ class ActsPanel(QWidget):
         self.summary_label.setStyleSheet("color: #666;")
         self.summary_label.setWordWrap(True)
 
-        self.create_button = QPushButton("Создать акт")
-        self.open_button = QPushButton("Открыть акт")
-        self.delete_button = QPushButton("Удалить акт")
-        self.print_tickets_button = QPushButton("Талоны")
-        self.print_act_button = QPushButton("Акт")
-        self.print_all_button = QPushButton("Акт + Талоны")
+        self.create_button = self._toolbar_button("Создать", "Создать акт")
+        self.open_button = self._toolbar_button("Открыть", "Открыть выбранный акт")
+        self.delete_button = self._toolbar_button("Удалить", "Удалить выбранный акт")
+        self.print_tickets_button = self._toolbar_button("Талоны", "Распечатать талоны выбранного акта")
+        self.print_act_button = self._toolbar_button("Акт", "Распечатать выбранный акт")
+        self.print_all_button = self._toolbar_button("Акт + Талоны", "Распечатать акт и талоны")
         set_button_icon(self.create_button, ICON_NEW)
         set_button_icon(self.open_button, ICON_OPEN)
         set_button_icon(self.delete_button, ICON_DELETE)
@@ -61,24 +59,14 @@ class ActsPanel(QWidget):
         self.print_act_button.clicked.connect(self._print_act)
         self.print_all_button.clicked.connect(self._print_act_and_tickets)
 
-        act_group = QGroupBox("Акт")
-        act_layout = QHBoxLayout()
-        act_layout.addWidget(self.create_button)
-        act_layout.addWidget(self.open_button)
-        act_layout.addWidget(self.delete_button)
-        act_group.setLayout(act_layout)
-
-        print_group = QGroupBox("Печать")
-        print_layout = QHBoxLayout()
-        print_layout.addWidget(self.print_tickets_button)
-        print_layout.addWidget(self.print_act_button)
-        print_layout.addWidget(self.print_all_button)
-        print_group.setLayout(print_layout)
-
-        toolbar = QHBoxLayout()
-        toolbar.addWidget(act_group)
-        toolbar.addWidget(print_group)
-        toolbar.addStretch()
+        toolbar = make_toolbar()
+        toolbar.addWidget(self.create_button)
+        toolbar.addWidget(self.open_button)
+        toolbar.addWidget(self.delete_button)
+        toolbar.addSeparator()
+        toolbar.addWidget(self.print_tickets_button)
+        toolbar.addWidget(self.print_act_button)
+        toolbar.addWidget(self.print_all_button)
 
         self.table = QTableView()
         self.table.setModel(self.model)
@@ -94,13 +82,16 @@ class ActsPanel(QWidget):
         self.table.setColumnWidth(2, 140)
 
         layout = QVBoxLayout()
-        layout.addLayout(toolbar)
+        layout.addWidget(toolbar)
         layout.addWidget(self.table)
         layout.addWidget(self.summary_label)
         self.setLayout(layout)
 
         self._setup_shortcuts()
         self.reload()
+
+    def _toolbar_button(self, text: str, tooltip: str):
+        return make_toolbar_button(text, tooltip)
 
     def reload(self) -> None:
         self.model.set_acts(self.act_service.list_acts(self.contract_id))

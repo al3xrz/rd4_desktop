@@ -69,6 +69,14 @@ RD4_DATA_DIR=.rd4 .venv/bin/python -m app.services.smoke
 
 See [`WINDOWS7_BUILD_GUIDE.md`](WINDOWS7_BUILD_GUIDE.md) and [`packaging/README.md`](packaging/README.md).
 
+## Documentation
+
+Новая структура документации: [`docs/`](docs/README.md).
+
+- Пользовательская документация: [`docs/user/`](docs/user/README.md)
+- Документация администратора: [`docs/admin/`](docs/admin/README.md)
+- Документация разработчика: [`docs/developer/`](docs/developer/README.md)
+
 ## UX
 
 Main page and registry UX proposal: [`MAIN_PAGE_UX_PROPOSAL.md`](MAIN_PAGE_UX_PROPOSAL.md).

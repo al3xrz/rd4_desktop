@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 try:
-    from PySide2.QtCore import QAbstractTableModel, QDateTime, QModelIndex, QSortFilterProxyModel, Qt, Signal
+    from PySide2.QtCore import QAbstractTableModel, QDateTime, QModelIndex, QSize, QSortFilterProxyModel, Qt, Signal
     from PySide2.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap
     from PySide2.QtWidgets import (
         QAction,
@@ -37,6 +37,8 @@ try:
         QTableView,
         QTabWidget,
         QTextEdit,
+        QToolBar,
+        QToolButton,
         QTreeWidget,
         QTreeWidgetItem,
         QVBoxLayout,
