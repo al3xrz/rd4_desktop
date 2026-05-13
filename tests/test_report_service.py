@@ -138,6 +138,71 @@ def test_financial_report_xlsx_includes_empty_days_and_category_totals(tmp_path,
     assert sheet["F9"].value == 50
 
 
+def test_reports_ignore_soft_deleted_act_rows_and_payments(tmp_path, monkeypatch):
+    configure_temp_database(tmp_path, monkeypatch)
+
+    from app.models import Role
+    from app.services import ActService, AuthService, ContractService, MedServiceService, ReportService
+
+    now = datetime(2026, 5, 13, 12, 0, tzinfo=timezone.utc)
+    admin = AuthService().create_user({"username": "admin", "password": "secret", "role": Role.ADMIN})
+    payload = contract_payload(now)
+    payload["prepay_inpatient_treatment"] = Decimal("0")
+    contract = ContractService().create_contract(payload, admin)
+    folder = MedServiceService().create_folder({"name": "Root"})
+    service = MedServiceService().create_service(
+        {
+            "parent_id": folder.id,
+            "code": "A01",
+            "name": "Consultation",
+            "unit": "шт",
+            "price": Decimal("100.00"),
+            "vat": 0,
+        }
+    )
+
+    acts = ActService()
+    act = acts.create_act(
+        contract.id,
+        {
+            "number": "A-DELETED",
+            "date": now,
+            "services": [{"med_service_id": service.id, "count": 2}],
+        },
+        admin,
+        add_payment=True,
+    )
+    acts.delete_act(act.id, admin)
+
+    reports = ReportService()
+    date_from = datetime(2026, 5, 13, tzinfo=timezone.utc)
+    date_to = datetime(2026, 5, 13, tzinfo=timezone.utc)
+
+    services_workbook = load_workbook(reports.render_services_report(date_from, date_to))
+    services_sheet = services_workbook.active
+    assert services_sheet["A4"].value == "13.05.2026"
+    assert services_sheet["B4"].value is None
+    assert services_sheet["E5"].value == "Итого:"
+    assert services_sheet["F5"].value == 0
+
+    financial_workbook = load_workbook(reports.render_financial_report(date_from, date_to))
+    financial_sheet = financial_workbook.active
+    assert financial_sheet["A4"].value == "13.05.2026"
+    assert financial_sheet["B4"].value is None
+    assert financial_sheet["E5"].value == "Итого:"
+    assert financial_sheet["F5"].value == 0
+
+    matrix_workbook = load_workbook(reports.render_services_matrix_report(date_from, date_to))
+    quantity = matrix_workbook["Количество"]
+    cost = matrix_workbook["Стоимость"]
+    rows_by_name = {quantity.cell(row=row, column=1).value: row for row in range(4, 5)}
+    service_row = rows_by_name["Consultation"]
+    assert quantity.cell(row=service_row, column=2).value == 0
+    assert quantity.cell(row=service_row, column=3).value == 0
+    assert cost.cell(row=service_row, column=2).value == 0
+    assert cost.cell(row=service_row, column=3).value == 0
+
+
 def test_services_matrix_report_has_quantity_and_cost_sheets(tmp_path, monkeypatch):
     configure_temp_database(tmp_path, monkeypatch)
 

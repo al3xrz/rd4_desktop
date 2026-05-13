@@ -15,10 +15,6 @@ ICON_WARNING = "#a16207"
 DIALOG_ICON_SIZE = QSize(18, 18)
 
 
-def standard_icon(pixmap: int):
-    return QApplication.style().standardIcon(pixmap)
-
-
 def set_button_icon(button, pixmap: int) -> None:
     button.setIcon(icon_for(pixmap))
 
@@ -61,7 +57,7 @@ def icon_for(pixmap: int):
     if pixmap == ICON_MATRIX_REPORT:
         return _matrix_report_icon()
     if pixmap == ICON_ABOUT:
-        return standard_icon(QStyle.SP_MessageBoxInformation)
+        return QApplication.style().standardIcon(QStyle.SP_MessageBoxInformation)
     if pixmap == ICON_EXIT:
         return _exit_icon()
     if pixmap == ICON_PASSWORD:
@@ -69,14 +65,14 @@ def icon_for(pixmap: int):
     if pixmap == ICON_CONTRACT:
         return _contract_icon()
     if pixmap == ICON_SAVE:
-        return standard_icon(QStyle.SP_DialogSaveButton)
+        return QApplication.style().standardIcon(QStyle.SP_DialogSaveButton)
     if pixmap == ICON_OK:
-        return standard_icon(QStyle.SP_DialogOkButton)
+        return QApplication.style().standardIcon(QStyle.SP_DialogOkButton)
     if pixmap == ICON_CANCEL:
-        return standard_icon(QStyle.SP_DialogCancelButton)
+        return QApplication.style().standardIcon(QStyle.SP_DialogCancelButton)
     if pixmap == ICON_SAVE_PRINT:
-        return standard_icon(QStyle.SP_DialogSaveButton)
-    return standard_icon(pixmap)
+        return QApplication.style().standardIcon(QStyle.SP_DialogSaveButton)
+    return QApplication.style().standardIcon(pixmap)
 
 
 def _qtawesome_icon(pixmap: int) -> QIcon | None:

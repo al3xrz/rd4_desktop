@@ -119,14 +119,6 @@ class ContractDetailsPage(QWidget):
         self.tabs.setTabText(0, f"Платежи ({self.payments_panel.payment_count()})")
         self.tabs.setTabText(1, f"Акты ({self.acts_panel.act_count()})")
 
-    def _placeholder(self, text: str) -> QWidget:
-        widget = QWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel(text))
-        layout.addStretch()
-        widget.setLayout(layout)
-        return widget
-
     def _back(self) -> None:
         if self.on_back is not None:
             self.on_back()

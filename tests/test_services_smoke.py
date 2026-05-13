@@ -173,6 +173,107 @@ def test_act_service_rows_merge_same_service_and_discount(tmp_path, monkeypatch)
     assert sorted((row.count, row.discount) for row in rows) == [(1, Decimal("5.00")), (7, Decimal("10.00"))]
 
 
+def test_act_number_is_generated_from_contract_number(tmp_path, monkeypatch):
+    configure_temp_database(tmp_path, monkeypatch)
+
+    from app.services import ActService, AuthService, ContractService, MedServiceService
+
+    now = datetime.now(timezone.utc)
+    admin = AuthService().create_user({"username": "admin", "password": "secret", "role": "admin"})
+    contract = ContractService().create_contract(contract_payload(now), admin)
+    folder = MedServiceService().create_folder({"name": "Root"})
+    service = MedServiceService().create_service(
+        {
+            "parent_id": folder.id,
+            "code": "A01",
+            "name": "Consultation",
+            "unit": "шт",
+            "price": Decimal("100.00"),
+            "vat": 0,
+        }
+    )
+
+    acts = ActService()
+    assert acts.next_act_number(contract.id) == "C-001 / 1"
+    first_act = acts.create_act(
+        contract.id,
+        {"date": now, "services": [{"med_service_id": service.id, "count": 1}]},
+        admin,
+    )
+    assert acts.next_act_number(contract.id) == "C-001 / 2"
+    second_act = acts.create_act(
+        contract.id,
+        {"number": "", "date": now, "services": [{"med_service_id": service.id, "count": 1}]},
+        admin,
+    )
+
+    assert first_act.number == "C-001 / 1"
+    assert second_act.number == "C-001 / 2"
+
+
+def test_act_save_options_create_payment_and_mark_contract_discharged(tmp_path, monkeypatch):
+    configure_temp_database(tmp_path, monkeypatch)
+
+    from app.core.database import session_scope
+    from app.models import Act, ActMedService, Payment
+    from app.services import ActService, AuthService, ContractService, MedServiceService, PaymentService
+    from app.services.exceptions import BusinessRuleError
+
+    now = datetime.now(timezone.utc)
+    admin = AuthService().create_user({"username": "admin", "password": "secret", "role": "admin"})
+    contracts = ContractService()
+    contract = contracts.create_contract(contract_payload(now), admin)
+    folder = MedServiceService().create_folder({"name": "Root"})
+    service = MedServiceService().create_service(
+        {
+            "parent_id": folder.id,
+            "code": "A01",
+            "name": "Consultation",
+            "unit": "шт",
+            "price": Decimal("100.00"),
+            "vat": 0,
+        }
+    )
+
+    act = ActService().create_act(
+        contract.id,
+        {
+            "number": "A-001",
+            "date": now,
+            "services": [{"med_service_id": service.id, "count": 2, "discount": Decimal("10.00")}],
+        },
+        admin,
+        add_payment=True,
+        mark_discharged=True,
+    )
+
+    payments = PaymentService().list_payments(contract.id)
+    updated_contract = contracts.get_contract(contract.id)
+    act_payment = [payment for payment in payments if payment.comments == f"Платеж по акту {act.number}"]
+    assert updated_contract.discharged is True
+    assert updated_contract.discharge_date == now.replace(tzinfo=None)
+    assert len(act_payment) == 1
+    assert act_payment[0].amount == Decimal("180.00")
+    assert ActService().is_act_paid(act.id) is True
+
+    with pytest.raises(BusinessRuleError):
+        ActService().update_act(act.id, {"comments": "edited"}, admin)
+
+    ActService().delete_act(act.id, admin)
+    deleted_act = ActService().list_acts(contract.id)[0]
+    assert deleted_act.id == act.id
+    assert deleted_act.deleted is True
+
+    with session_scope() as session:
+        deleted_payments = session.query(Payment).filter_by(comments=f"Платеж по акту {act.number}").all()
+        rows = session.query(ActMedService).filter_by(act_id=act.id).all()
+        assert deleted_payments
+        assert all(payment.deleted for payment in deleted_payments)
+        assert rows
+        assert all(row.deleted for row in rows)
+        assert session.get(Act, act.id).deleted is True
+
+
 def test_contract_soft_delete_cascades_to_payments_and_acts(tmp_path, monkeypatch):
     configure_temp_database(tmp_path, monkeypatch)
 
@@ -206,6 +307,9 @@ def test_contract_soft_delete_cascades_to_payments_and_acts(tmp_path, monkeypatc
 
     assert contracts.list_contracts() == []
     assert [item.id for item in contracts.list_contracts({"include_deleted": True})] == [contract.id]
+    deleted_acts = ActService().list_acts(contract.id)
+    assert [item.id for item in deleted_acts] == [act.id]
+    assert deleted_acts[0].deleted is True
     with session_scope() as session:
         assert session.get(Contract, contract.id).deleted is True
         assert session.get(Act, act.id).deleted is True

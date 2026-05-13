@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from app.models import Act, User
 from app.services import ActService, DocxService
 from app.services.exceptions import DomainError
@@ -42,12 +44,12 @@ class ActsPanel(QWidget):
         self.summary_label.setStyleSheet("color: #666;")
         self.summary_label.setWordWrap(True)
 
-        self.create_button = self._toolbar_button("Создать", "Создать акт")
-        self.open_button = self._toolbar_button("Открыть", "Открыть выбранный акт")
-        self.delete_button = self._toolbar_button("Удалить", "Удалить выбранный акт")
-        self.print_tickets_button = self._toolbar_button("Талоны", "Распечатать талоны выбранного акта")
-        self.print_act_button = self._toolbar_button("Акт", "Распечатать выбранный акт")
-        self.print_all_button = self._toolbar_button("Акт + Талоны", "Распечатать акт и талоны")
+        self.create_button = make_toolbar_button("Создать", "Создать акт")
+        self.open_button = make_toolbar_button("Открыть", "Открыть выбранный акт")
+        self.delete_button = make_toolbar_button("Удалить", "Удалить выбранный акт")
+        self.print_tickets_button = make_toolbar_button("Талоны", "Распечатать талоны выбранного акта")
+        self.print_act_button = make_toolbar_button("Акт", "Распечатать выбранный акт")
+        self.print_all_button = make_toolbar_button("Акт + Талоны", "Распечатать акт и талоны")
         set_button_icon(self.create_button, ICON_NEW)
         set_button_icon(self.open_button, ICON_OPEN)
         set_button_icon(self.delete_button, ICON_DELETE)
@@ -93,9 +95,6 @@ class ActsPanel(QWidget):
         self._setup_shortcuts()
         self.reload()
 
-    def _toolbar_button(self, text: str, tooltip: str):
-        return make_toolbar_button(text, tooltip)
-
     def reload(self) -> None:
         self.model.set_acts(self.act_service.list_acts(self.contract_id))
         self._update_totals()
@@ -107,7 +106,7 @@ class ActsPanel(QWidget):
     def _update_totals(self) -> None:
         acts = self.model.acts
         service_count = sum(sum(1 for row in act.services if not row.deleted) for act in acts)
-        total = sum((self.model.services_total(act) for act in acts), start=self.model.zero_total())
+        total = sum((self.model.services_total(act) for act in acts), start=Decimal("0"))
         self.total_label.setText(f"Актов: {len(acts)} | Услуг: {service_count} | Сумма по актам: {total}")
 
     def _selected_act(self) -> Act | None:
@@ -142,6 +141,9 @@ class ActsPanel(QWidget):
         if act is None:
             QMessageBox.warning(self, "Роддом №4", "Выберите акт")
             return
+        if act.deleted:
+            QMessageBox.warning(self, "Роддом №4", "Акт уже удален")
+            return
         confirmed = QMessageBox.question(self, "Удалить акт", f"Удалить акт {act.number}?")
         if confirmed != QMessageBox.Yes:
             return
@@ -157,6 +159,9 @@ class ActsPanel(QWidget):
         if act is None:
             QMessageBox.warning(self, "Роддом №4", "Выберите акт")
             return
+        if act.deleted:
+            QMessageBox.warning(self, "Роддом №4", "Удаленный акт нельзя распечатать")
+            return
         try:
             path = self.docx_service.render_act_ticket(act.id)
             self.docx_service.open_document(path)
@@ -168,6 +173,9 @@ class ActsPanel(QWidget):
         if act is None:
             QMessageBox.warning(self, "Роддом №4", "Выберите акт")
             return
+        if act.deleted:
+            QMessageBox.warning(self, "Роддом №4", "Удаленный акт нельзя распечатать")
+            return
         try:
             path = self.docx_service.render_act(act.id)
             self.docx_service.open_document(path)
@@ -178,6 +186,9 @@ class ActsPanel(QWidget):
         act = self._selected_act()
         if act is None:
             QMessageBox.warning(self, "Роддом №4", "Выберите акт")
+            return
+        if act.deleted:
+            QMessageBox.warning(self, "Роддом №4", "Удаленный акт нельзя распечатать")
             return
         try:
             act_path = self.docx_service.render_act(act.id)
@@ -224,10 +235,11 @@ class ActsPanel(QWidget):
         act = self._selected_act()
         has_selection = act is not None
         self.open_button.setEnabled(has_selection)
-        self.delete_button.setEnabled(has_selection)
-        self.print_tickets_button.setEnabled(has_selection)
-        self.print_act_button.setEnabled(has_selection)
-        self.print_all_button.setEnabled(has_selection)
+        can_change = has_selection and not act.deleted
+        self.delete_button.setEnabled(can_change)
+        self.print_tickets_button.setEnabled(can_change)
+        self.print_act_button.setEnabled(can_change)
+        self.print_all_button.setEnabled(can_change)
 
         if act is None:
             if self.model.rowCount() == 0:
@@ -239,4 +251,5 @@ class ActsPanel(QWidget):
         service_count = sum(1 for row in act.services if not row.deleted)
         total = self.model.services_total(act)
         comment = f" | комментарий: {act.comments}" if act.comments else ""
-        self.summary_label.setText(f"Акт: {act.number} | услуг: {service_count} | сумма: {total}{comment}")
+        deleted = " | удален" if act.deleted else ""
+        self.summary_label.setText(f"Акт: {act.number}{deleted} | услуг: {service_count} | сумма: {total}{comment}")

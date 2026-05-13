@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RD4 Desktop - взаимодействие модулей</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #64748b;
+      --line: #cbd5e1;
+      --ui: #dbeafe;
+      --ui-border: #2563eb;
+      --service: #dcfce7;
+      --service-border: #16a34a;
+      --repo: #fef3c7;
+      --repo-border: #d97706;
+      --model: #fce7f3;
+      --model-border: #db2777;
+      --core: #ede9fe;
+      --core-border: #7c3aed;
+      --doc: #e0f2fe;
+      --doc-border: #0284c7;
+      --warn: #fff7ed;
+      --warn-border: #ea580c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      background: #111827;
+      color: #ffffff;
+      padding: 28px 32px;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 980px;
+      color: #cbd5e1;
+    }
+
+    main {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    section {
+      background: var(--panel);
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin: 0 0 24px;
+      padding: 20px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 21px;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 16px;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 0;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot.ui { background: var(--ui-border); }
+    .dot.service { background: var(--service-border); }
+    .dot.repo { background: var(--repo-border); }
+    .dot.model { background: var(--model-border); }
+    .dot.core { background: var(--core-border); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .card {
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      padding: 12px;
+      min-height: 126px;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .card ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .card li {
+      margin: 3px 0;
+      color: #334155;
+    }
+
+    .ui { background: var(--ui); border-color: var(--ui-border); }
+    .service { background: var(--service); border-color: var(--service-border); }
+    .repo { background: var(--repo); border-color: var(--repo-border); }
+    .model { background: var(--model); border-color: var(--model-border); }
+    .core { background: var(--core); border-color: var(--core-border); }
+    .doc { background: var(--doc); border-color: var(--doc-border); }
+    .warn { background: var(--warn); border-color: var(--warn-border); }
+
+    .diagram {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    svg {
+      display: block;
+      min-width: 1120px;
+      width: 100%;
+      height: auto;
+    }
+
+    .box {
+      rx: 8;
+      ry: 8;
+      stroke-width: 1.5;
+    }
+
+    .box.ui { fill: var(--ui); stroke: var(--ui-border); }
+    .box.service { fill: var(--service); stroke: var(--service-border); }
+    .box.repo { fill: var(--repo); stroke: var(--repo-border); }
+    .box.model { fill: var(--model); stroke: var(--model-border); }
+    .box.core { fill: var(--core); stroke: var(--core-border); }
+    .box.doc { fill: var(--doc); stroke: var(--doc-border); }
+    .box.warn { fill: var(--warn); stroke: var(--warn-border); }
+
+    .label {
+      font-size: 14px;
+      font-weight: 700;
+      fill: #111827;
+    }
+
+    .small {
+      font-size: 12px;
+      fill: #334155;
+    }
+
+    .muted {
+      font-size: 12px;
+      fill: #64748b;
+    }
+
+    .arrow {
+      stroke: #475569;
+      stroke-width: 1.6;
+      fill: none;
+      marker-end: url(#arrow);
+    }
+
+    .soft-arrow {
+      stroke: #94a3b8;
+      stroke-width: 1.4;
+      fill: none;
+      marker-end: url(#arrow-soft);
+      stroke-dasharray: 5 4;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th,
+    td {
+      border: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+
+    code {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        padding: 12px;
+      }
+
+      header {
+        padding: 22px 18px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>RD4 Desktop: структура взаимодействия модулей</h1>
+    <p>
+      Схема показывает, как UI, сервисы, репозитории, модели и инфраструктура
+      связаны между собой. Направление зависимостей остается строгим:
+      <code>ui -> services -> repositories -> models/core</code>.
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Слои приложения</h2>
+      <p>
+        Каждый слой отвечает за свой уровень абстракции. UI не делает SQL-запросы,
+        сервисы владеют транзакциями, репозитории только читают и меняют ORM-объекты,
+        модели описывают таблицы, а core дает инфраструктуру.
+      </p>
+      <div class="legend">
+        <span><i class="dot ui"></i>UI</span>
+        <span><i class="dot service"></i>Services</span>
+        <span><i class="dot repo"></i>Repositories</span>
+        <span><i class="dot model"></i>Models</span>
+        <span><i class="dot core"></i>Core</span>
+      </div>
+      <div class="grid">
+        <article class="card ui">
+          <h3>app/ui</h3>
+          <ul>
+            <li>окна и страницы PySide2</li>
+            <li>табличные модели</li>
+            <li>диалоги ввода</li>
+            <li>показ ошибок пользователю</li>
+          </ul>
+        </article>
+        <article class="card service">
+          <h3>app/services</h3>
+          <ul>
+            <li>бизнес-операции</li>
+            <li>одна транзакция на операцию</li>
+            <li>валидация правил</li>
+            <li>DomainError для UI</li>
+          </ul>
+        </article>
+        <article class="card repo">
+          <h3>app/repositories</h3>
+          <ul>
+            <li>SQLAlchemy-запросы</li>
+            <li>create/update/list/get</li>
+            <li>soft-delete</li>
+            <li>flush без commit</li>
+          </ul>
+        </article>
+        <article class="card model">
+          <h3>app/models</h3>
+          <ul>
+            <li>ORM-таблицы</li>
+            <li>связи сущностей</li>
+            <li>индексы и ограничения</li>
+            <li>без зависимости от UI</li>
+          </ul>
+        </article>
+        <article class="card core">
+          <h3>app/core</h3>
+          <ul>
+            <li>пути и настройки</li>
+            <li>SQLite и сессии</li>
+            <li>Alembic</li>
+            <li>логирование и пароли</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Граф зависимостей</h2>
+      <div class="diagram" role="img" aria-label="Граф взаимодействия модулей RD4 Desktop">
+        <svg viewBox="0 0 1180 840" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L9,3 L0,6 Z" fill="#475569"></path>
+            </marker>
+            <marker id="arrow-soft" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L9,3 L0,6 Z" fill="#94a3b8"></path>
+            </marker>
+          </defs>
+
+          <rect class="box core" x="45" y="34" width="190" height="74"></rect>
+          <text class="label" x="66" y="64">app.main</text>
+          <text class="small" x="66" y="86">старт, миграции, UI</text>
+
+          <rect class="box core" x="290" y="34" width="250" height="74"></rect>
+          <text class="label" x="314" y="64">app.core</text>
+          <text class="small" x="314" y="86">config, database, paths, logging</text>
+
+          <rect class="box service" x="595" y="34" width="250" height="74"></rect>
+          <text class="label" x="619" y="64">services.bootstrap</text>
+          <text class="small" x="619" y="86">начальный администратор</text>
+
+          <rect class="box ui" x="45" y="160" width="205" height="88"></rect>
+          <text class="label" x="67" y="192">ui.application</text>
+          <text class="small" x="67" y="214">QApplication</text>
+          <text class="small" x="67" y="232">login flow</text>
+
+          <rect class="box ui" x="305" y="160" width="205" height="88"></rect>
+          <text class="label" x="327" y="192">LoginWindow</text>
+          <text class="small" x="327" y="214">вход пользователя</text>
+
+          <rect class="box ui" x="565" y="160" width="260" height="88"></rect>
+          <text class="label" x="589" y="192">MainWindow</text>
+          <text class="small" x="589" y="214">меню, навигация, отчеты</text>
+
+          <rect class="box ui" x="45" y="310" width="200" height="92"></rect>
+          <text class="label" x="66" y="340">ContractsPage</text>
+          <text class="small" x="66" y="362">реестр и фильтры</text>
+          <text class="small" x="66" y="380">печать договора</text>
+
+          <rect class="box ui" x="280" y="310" width="220" height="92"></rect>
+          <text class="label" x="302" y="340">ContractDetailsPage</text>
+          <text class="small" x="302" y="362">карточка договора</text>
+          <text class="small" x="302" y="380">платежи и акты</text>
+
+          <rect class="box ui" x="535" y="310" width="190" height="92"></rect>
+          <text class="label" x="557" y="340">MedServicesPage</text>
+          <text class="small" x="557" y="362">справочник услуг</text>
+
+          <rect class="box ui" x="760" y="310" width="170" height="92"></rect>
+          <text class="label" x="782" y="340">UsersPage</text>
+          <text class="small" x="782" y="362">пользователи</text>
+
+          <rect class="box ui" x="55" y="455" width="185" height="88"></rect>
+          <text class="label" x="76" y="486">PaymentsPanel</text>
+          <text class="small" x="76" y="508">оплаты и возвраты</text>
+
+          <rect class="box ui" x="280" y="455" width="185" height="88"></rect>
+          <text class="label" x="302" y="486">ActsPanel</text>
+          <text class="small" x="302" y="508">акты договора</text>
+
+          <rect class="box ui" x="505" y="455" width="220" height="88"></rect>
+          <text class="label" x="528" y="486">ActDialog</text>
+          <text class="small" x="528" y="508">строки услуг и итоги</text>
+
+          <rect class="box ui" x="765" y="455" width="220" height="88"></rect>
+          <text class="label" x="788" y="486">MedServicePicker</text>
+          <text class="small" x="788" y="508">выбор услуги</text>
+
+          <rect class="box service" x="45" y="610" width="180" height="74"></rect>
+          <text class="label" x="66" y="640">AuthService</text>
+          <text class="small" x="66" y="662">логин и пользователи</text>
+
+          <rect class="box service" x="250" y="610" width="180" height="74"></rect>
+          <text class="label" x="271" y="640">ContractService</text>
+          <text class="small" x="271" y="662">договоры и баланс</text>
+
+          <rect class="box service" x="455" y="610" width="180" height="74"></rect>
+          <text class="label" x="476" y="640">PaymentService</text>
+          <text class="small" x="476" y="662">оплаты и возвраты</text>
+
+          <rect class="box service" x="660" y="610" width="180" height="74"></rect>
+          <text class="label" x="681" y="640">ActService</text>
+          <text class="small" x="681" y="662">акты и строки</text>
+
+          <rect class="box service" x="865" y="610" width="205" height="74"></rect>
+          <text class="label" x="886" y="640">MedServiceService</text>
+          <text class="small" x="886" y="662">дерево услуг</text>
+
+          <rect class="box doc" x="900" y="160" width="220" height="88"></rect>
+          <text class="label" x="923" y="192">DocxService / ReportService</text>
+          <text class="small" x="923" y="214">DOCX и XLSX</text>
+          <text class="small" x="923" y="232">временные файлы</text>
+
+          <rect class="box repo" x="220" y="725" width="315" height="74"></rect>
+          <text class="label" x="244" y="755">Repositories</text>
+          <text class="small" x="244" y="777">Contract, Payment, Act, MedService, User</text>
+
+          <rect class="box model" x="610" y="725" width="250" height="74"></rect>
+          <text class="label" x="634" y="755">Models</text>
+          <text class="small" x="634" y="777">ORM-сущности SQLAlchemy</text>
+
+          <rect class="box core" x="925" y="725" width="200" height="74"></rect>
+          <text class="label" x="949" y="755">SQLite rd4.db</text>
+          <text class="small" x="949" y="777">данные приложения</text>
+
+          <path class="arrow" d="M235 71 L290 71"></path>
+          <path class="arrow" d="M235 89 C330 125 500 125 595 89"></path>
+          <path class="arrow" d="M140 108 L140 160"></path>
+          <path class="arrow" d="M250 204 L305 204"></path>
+          <path class="arrow" d="M510 204 L565 204"></path>
+          <path class="arrow" d="M695 248 L695 290 C695 300 660 300 630 310"></path>
+          <path class="arrow" d="M650 248 C500 270 210 270 145 310"></path>
+          <path class="arrow" d="M700 248 C620 275 470 275 390 310"></path>
+          <path class="arrow" d="M720 248 C780 270 825 275 845 310"></path>
+          <path class="arrow" d="M390 402 L150 455"></path>
+          <path class="arrow" d="M390 402 L372 455"></path>
+          <path class="arrow" d="M465 499 L505 499"></path>
+          <path class="arrow" d="M725 499 L765 499"></path>
+          <path class="arrow" d="M407 248 C350 365 335 495 340 610"></path>
+          <path class="arrow" d="M145 402 C175 495 260 545 340 610"></path>
+          <path class="arrow" d="M150 543 C230 585 330 600 455 635"></path>
+          <path class="arrow" d="M615 543 C650 575 690 596 750 610"></path>
+          <path class="arrow" d="M875 543 C900 575 925 596 967 610"></path>
+          <path class="arrow" d="M845 402 C850 505 890 560 967 610"></path>
+          <path class="arrow" d="M825 204 L900 204"></path>
+          <path class="soft-arrow" d="M1010 248 C980 355 900 520 760 610"></path>
+          <path class="soft-arrow" d="M1010 248 C920 360 600 505 340 610"></path>
+          <path class="arrow" d="M545 684 C525 705 460 715 380 725"></path>
+          <path class="arrow" d="M750 684 C680 705 560 715 380 725"></path>
+          <path class="arrow" d="M967 684 C820 712 615 720 380 725"></path>
+          <path class="arrow" d="M535 762 L610 762"></path>
+          <path class="arrow" d="M860 762 L925 762"></path>
+          <path class="soft-arrow" d="M925 762 C700 830 390 830 380 800"></path>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <h2>Ключевые пользовательские потоки</h2>
+      <div class="diagram" role="img" aria-label="Последовательности пользовательских сценариев RD4 Desktop">
+        <svg viewBox="0 0 1180 520" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L9,3 L0,6 Z" fill="#475569"></path>
+            </marker>
+          </defs>
+
+          <line x1="120" y1="70" x2="120" y2="455" stroke="#cbd5e1" stroke-width="2"></line>
+          <line x1="330" y1="70" x2="330" y2="455" stroke="#cbd5e1" stroke-width="2"></line>
+          <line x1="540" y1="70" x2="540" y2="455" stroke="#cbd5e1" stroke-width="2"></line>
+          <line x1="750" y1="70" x2="750" y2="455" stroke="#cbd5e1" stroke-width="2"></line>
+          <line x1="960" y1="70" x2="960" y2="455" stroke="#cbd5e1" stroke-width="2"></line>
+
+          <rect class="box ui" x="40" y="20" width="160" height="50"></rect>
+          <text class="label" x="70" y="50">UI</text>
+
+          <rect class="box service" x="250" y="20" width="160" height="50"></rect>
+          <text class="label" x="284" y="50">Services</text>
+
+          <rect class="box repo" x="460" y="20" width="160" height="50"></rect>
+          <text class="label" x="500" y="50">Repos</text>
+
+          <rect class="box model" x="670" y="20" width="160" height="50"></rect>
+          <text class="label" x="708" y="50">Models</text>
+
+          <rect class="box core" x="880" y="20" width="160" height="50"></rect>
+          <text class="label" x="918" y="50">SQLite</text>
+
+          <path d="M120 110 L330 110" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="142" y="100">LoginWindow.login()</text>
+          <path d="M330 135 L540 135" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="360" y="125">AuthService -> UserRepository</text>
+          <path d="M540 160 L750 160" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="570" y="150">User ORM</text>
+          <path d="M750 185 L960 185" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="790" y="175">select users</text>
+
+          <path d="M120 245 L330 245" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="142" y="235">ActDialog.save()</text>
+          <path d="M330 270 L540 270" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="360" y="260">ActService.create_act()</text>
+          <path d="M540 295 L750 295" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="570" y="285">Act + ActMedService</text>
+          <path d="M750 320 L960 320" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="790" y="310">insert / update</text>
+
+          <path d="M120 380 L330 380" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="142" y="370">Report menu</text>
+          <path d="M330 405 L540 405" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="360" y="395">ReportService</text>
+          <path d="M540 430 L750 430" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="570" y="420">Act rows / Payment rows</text>
+          <path d="M750 455 L960 455" stroke="#475569" stroke-width="1.6" marker-end="url(#arrow2)"></path>
+          <text class="small" x="790" y="445">read period</text>
+
+          <rect class="box warn" x="70" y="470" width="1010" height="34"></rect>
+          <text class="small" x="92" y="492">Все изменения бизнес-данных проходят через service-level транзакцию: UI -> Service -> session_scope -> Repository -> ORM -> SQLite.</text>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <h2>Матрица взаимодействий</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Сценарий</th>
+            <th>UI</th>
+            <th>Сервис</th>
+            <th>Репозитории</th>
+            <th>Результат</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Вход</td>
+            <td><code>LoginWindow</code></td>
+            <td><code>AuthService.login</code></td>
+            <td><code>UserRepository</code></td>
+            <td>Открывается <code>MainWindow</code> для выбранного пользователя.</td>
+          </tr>
+          <tr>
+            <td>Реестр договоров</td>
+            <td><code>ContractsPage</code>, <code>ContractsTableModel</code></td>
+            <td><code>ContractService</code></td>
+            <td><code>ContractRepository</code></td>
+            <td>Список договоров, агрегированные балансы, фильтры и фокус строки.</td>
+          </tr>
+          <tr>
+            <td>Карточка договора</td>
+            <td><code>ContractDetailsPage</code></td>
+            <td><code>ContractService</code></td>
+            <td><code>ContractRepository</code></td>
+            <td>Шапка договора, сводка баланса, вкладки платежей и актов.</td>
+          </tr>
+          <tr>
+            <td>Платежи</td>
+            <td><code>PaymentsPanel</code>, <code>PaymentDialog</code></td>
+            <td><code>PaymentService</code></td>
+            <td><code>PaymentRepository</code>, <code>ContractRepository</code></td>
+            <td>Оплата, возврат, редактирование и распроведение платежей.</td>
+          </tr>
+          <tr>
+            <td>Акты</td>
+            <td><code>ActsPanel</code>, <code>ActDialog</code>, <code>MedServicePickerDialog</code></td>
+            <td><code>ActService</code>, <code>MedServiceService</code></td>
+            <td><code>ActRepository</code>, <code>ActMedServiceRepository</code>, <code>MedServiceRepository</code></td>
+            <td>Акт с авто-подставленным номером, строками услуг и итогом.</td>
+          </tr>
+          <tr>
+            <td>Справочник услуг</td>
+            <td><code>MedServicesPage</code>, <code>MedServiceDialog</code></td>
+            <td><code>MedServiceService</code></td>
+            <td><code>MedServiceRepository</code></td>
+            <td>Дерево папок и услуг, проверка родителя и циклов.</td>
+          </tr>
+          <tr>
+            <td>Печать DOCX</td>
+            <td><code>ContractsPage</code>, <code>ContractDetailsPage</code>, <code>ActsPanel</code></td>
+            <td><code>DocxService</code></td>
+            <td>через <code>ContractService</code> и <code>ActService</code></td>
+            <td>DOCX во временной папке и открытие системным приложением.</td>
+          </tr>
+          <tr>
+            <td>Отчеты XLSX</td>
+            <td><code>MainWindow</code>, <code>ReportPeriodDialog</code></td>
+            <td><code>ReportService</code></td>
+            <td><code>ActMedServiceRepository</code>, <code>PaymentRepository</code>, <code>MedServiceRepository</code></td>
+            <td>XLSX-отчеты по услугам, финансам и матрице услуг.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Правила чтения схемы</h2>
+      <ul>
+        <li>Сплошные стрелки показывают прямой вызов или зависимость.</li>
+        <li>Пунктирные стрелки показывают косвенное получение данных через сервисы.</li>
+        <li>UI показывает ошибки только через <code>DomainError</code>, не через SQLAlchemy-исключения.</li>
+        <li>Репозитории не вызывают <code>commit()</code>; транзакцию завершает <code>session_scope()</code>.</li>
+        <li>Модели и репозитории ничего не знают о PySide2.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

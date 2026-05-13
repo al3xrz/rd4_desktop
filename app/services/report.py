@@ -103,7 +103,14 @@ class ReportService:
         sheet.title = "Услуги"
 
         grouped_rows = self._group_report_rows(rows)
-        title = f"Отчет по услугам за период с {date_from.strftime('%d.%m.%Y')} по {self._inclusive_to(date_to).strftime('%d.%m.%Y')}"
+        title = f"Отчет по услугам за период с {date_from.strftime('%d.%m.%Y')} по {date_to.strftime('%d.%m.%Y')}"
+
+        def cell_alignment(column: int):
+            if column == 3:
+                return Alignment(horizontal="left", vertical="center", wrap_text=True)
+            if column in {4, 5, 6}:
+                return Alignment(horizontal="right", vertical="center")
+            return Alignment(horizontal="center", vertical="center")
 
         sheet.merge_cells("A1:F1")
         sheet["A1"] = title
@@ -129,7 +136,7 @@ class ReportService:
                     cell = sheet.cell(row=row_number, column=column, value=value)
                     cell.fill = fill
                     cell.border = border
-                    cell.alignment = self._cell_alignment(column)
+                    cell.alignment = cell_alignment(column)
                 row_number += 1
                 continue
             for item_index, item in enumerate(items):
@@ -147,7 +154,7 @@ class ReportService:
                     cell = sheet.cell(row=row_number, column=column, value=value)
                     cell.fill = fill
                     cell.border = border
-                    cell.alignment = self._cell_alignment(column)
+                    cell.alignment = cell_alignment(column)
                     if column in {4, 6}:
                         cell.number_format = '#,##0.00'
                 row_number += 1
@@ -159,7 +166,7 @@ class ReportService:
             cell = sheet.cell(row=total_row, column=column)
             cell.font = Font(bold=True)
             cell.border = border
-            cell.alignment = self._cell_alignment(column)
+            cell.alignment = cell_alignment(column)
             if column == 6:
                 cell.number_format = '#,##0.00'
 
@@ -170,7 +177,7 @@ class ReportService:
 
         output_dir = Path(tempfile.gettempdir()) / "rd4"
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"services_report_{date_from.strftime('%Y%m%d')}_{self._inclusive_to(date_to).strftime('%Y%m%d')}.xlsx"
+        output_path = output_dir / f"services_report_{date_from.strftime('%Y%m%d')}_{date_to.strftime('%Y%m%d')}.xlsx"
         workbook.save(output_path)
         return output_path
 
@@ -232,8 +239,18 @@ class ReportService:
         sheet = workbook.active
         sheet.title = "Финансы"
 
-        grouped_rows = self._group_financial_report_rows(rows)
+        grouped_rows: OrderedDict = OrderedDict()
+        for row in rows:
+            grouped_rows.setdefault(row["date"].date(), [])
+            grouped_rows[row["date"].date()].append(row)
         title = f"Финансовый отчет за период с {date_from.strftime('%d.%m.%Y')} по {date_to.strftime('%d.%m.%Y')}"
+
+        def cell_alignment(column: int):
+            if column in {3, 6}:
+                return Alignment(horizontal="left", vertical="center", wrap_text=True)
+            if column == 4:
+                return Alignment(horizontal="right", vertical="center")
+            return Alignment(horizontal="center", vertical="center")
 
         sheet.merge_cells("A1:F1")
         sheet["A1"] = title
@@ -253,6 +270,15 @@ class ReportService:
         category_totals: OrderedDict[str, Decimal] = OrderedDict()
         row_number = 4
 
+        def style_total_row(row_number: int) -> None:
+            for column in range(5, 7):
+                cell = sheet.cell(row=row_number, column=column)
+                cell.font = Font(bold=True)
+                cell.border = border
+                cell.alignment = cell_alignment(column)
+                if column == 6:
+                    cell.number_format = '#,##0.00'
+
         for group_index, (date_value, items) in enumerate(self._iter_report_days(grouped_rows, date_from, date_to)):
             fill = fills[group_index % len(fills)]
             if not items:
@@ -260,7 +286,7 @@ class ReportService:
                     cell = sheet.cell(row=row_number, column=column, value=value)
                     cell.fill = fill
                     cell.border = border
-                    cell.alignment = self._financial_cell_alignment(column)
+                    cell.alignment = cell_alignment(column)
                 row_number += 1
                 continue
 
@@ -281,7 +307,7 @@ class ReportService:
                     cell = sheet.cell(row=row_number, column=column, value=value)
                     cell.fill = fill
                     cell.border = border
-                    cell.alignment = self._financial_cell_alignment(column)
+                    cell.alignment = cell_alignment(column)
                     if column == 4:
                         cell.number_format = '#,##0.00'
                 row_number += 1
@@ -289,13 +315,13 @@ class ReportService:
         total_row = row_number
         sheet.cell(row=total_row, column=5, value="Итого:")
         sheet.cell(row=total_row, column=6, value=total)
-        self._style_financial_total_row(sheet, total_row, border)
+        style_total_row(total_row)
         row_number += 1
 
         for category, amount in category_totals.items():
             sheet.cell(row=row_number, column=5, value=f"Итого {category}:")
             sheet.cell(row=row_number, column=6, value=amount)
-            self._style_financial_total_row(sheet, row_number, border)
+            style_total_row(row_number)
             row_number += 1
 
         widths = [14, 18, 34, 16, 18, 56]
@@ -324,14 +350,6 @@ class ReportService:
                 }
             grouped[date_key][service_key]["count"] += row["count"]
         return OrderedDict((date_key, list(items.values())) for date_key, items in grouped.items())
-
-    def _group_financial_report_rows(self, rows: list[dict]) -> OrderedDict:
-        grouped: OrderedDict = OrderedDict()
-        for row in rows:
-            date_key = row["date"].date()
-            grouped.setdefault(date_key, [])
-            grouped[date_key].append(row)
-        return grouped
 
     def _services_with_report_rows(self, services: list[dict], rows: list[dict]) -> list[dict]:
         result: OrderedDict[int, dict] = OrderedDict((service["id"], service) for service in services)
@@ -362,22 +380,8 @@ class ReportService:
             yield current, grouped_rows.get(current, [])
             current = current + timedelta(days=1)
 
-    def _inclusive_to(self, date_to: datetime) -> datetime:
-        return date_to
-
     def _start_of_day(self, value: datetime) -> datetime:
         return value.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    def _cell_alignment(self, column: int):
-        try:
-            from openpyxl.styles import Alignment
-        except ImportError as exc:
-            raise BusinessRuleError("Для отчётов XLSX установите зависимость openpyxl.") from exc
-        if column == 3:
-            return Alignment(horizontal="left", vertical="center", wrap_text=True)
-        if column in {4, 5, 6}:
-            return Alignment(horizontal="right", vertical="center")
-        return Alignment(horizontal="center", vertical="center")
 
     def _fill_services_matrix_sheet(
         self,
@@ -452,30 +456,3 @@ class ReportService:
         if value == int(value):
             return int(value)
         return value
-
-    def _financial_cell_alignment(self, column: int):
-        try:
-            from openpyxl.styles import Alignment
-        except ImportError as exc:
-            raise BusinessRuleError("Для отчётов XLSX установите зависимость openpyxl.") from exc
-        if column in {3, 6}:
-            return Alignment(horizontal="left", vertical="center", wrap_text=True)
-        if column == 4:
-            return Alignment(horizontal="right", vertical="center")
-        return Alignment(horizontal="center", vertical="center")
-
-    def _style_financial_total_row(self, sheet, row_number: int, border) -> None:
-        for column in range(5, 7):
-            cell = sheet.cell(row=row_number, column=column)
-            cell.font = self._bold_font()
-            cell.border = border
-            cell.alignment = self._financial_cell_alignment(column)
-            if column == 6:
-                cell.number_format = '#,##0.00'
-
-    def _bold_font(self):
-        try:
-            from openpyxl.styles import Font
-        except ImportError as exc:
-            raise BusinessRuleError("Для отчётов XLSX установите зависимость openpyxl.") from exc
-        return Font(bold=True)

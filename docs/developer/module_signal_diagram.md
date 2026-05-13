@@ -111,6 +111,7 @@ sequenceDiagram
     Picker-->>ActDialog: accepted(selected_service)
     ActDialog->>Services: ActService.create_act() / update_act()
     ActDialog->>Services: ActService.add_service()
+    Note over ActDialog,Services: Для нового акта пустой номер генерируется как {номер договора} / {номер акта по договору}.
     Note over ActDialog,Services: Если услуга и скидка совпадают, количество увеличивается вместо новой строки.
 
     Details-->>Main: back_button.clicked

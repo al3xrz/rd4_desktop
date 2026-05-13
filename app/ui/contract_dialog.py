@@ -726,16 +726,13 @@ class ContractDialog(QDialog):
             invalid.append(self.service_insurance_number)
             messages.append("Для ФОМС укажите номер полиса/страхового случая.")
 
-        return self._deduplicate_widgets(invalid), messages
-
-    def _deduplicate_widgets(self, widgets: list[QWidget]) -> list[QWidget]:
-        result: list[QWidget] = []
+        unique_invalid: list[QWidget] = []
         seen = set()
-        for widget in widgets:
+        for widget in invalid:
             if widget not in seen:
-                result.append(widget)
+                unique_invalid.append(widget)
                 seen.add(widget)
-        return result
+        return unique_invalid, messages
 
     def _highlight_invalid_widgets(self, widgets: list[QWidget]) -> None:
         self._clear_validation_highlight()

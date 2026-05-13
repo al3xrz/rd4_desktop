@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.models import Act
-from app.ui.qt import QAbstractTableModel, QModelIndex, Qt
+from app.ui.qt import QAbstractTableModel, QBrush, QColor, QFont, QModelIndex, Qt
 
 
 class ActsTableModel(QAbstractTableModel):
@@ -26,16 +26,22 @@ class ActsTableModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
         if not index.isValid():
             return None
+        act = self.acts[index.row()]
         if role == Qt.TextAlignmentRole:
             return self._alignment(index.column())
+        if role == Qt.ForegroundRole and act.deleted:
+            return QBrush(QColor("#777777"))
+        if role == Qt.FontRole and act.deleted:
+            font = QFont()
+            font.setStrikeOut(True)
+            return font
         if role != Qt.DisplayRole:
             return None
-        act = self.acts[index.row()]
         values = [
             act.number,
             act.date.strftime("%d.%m.%Y") if act.date else "",
             self._format_money(self.services_total(act)),
-            act.comments or "",
+            self._comments_text(act),
         ]
         return values[index.column()]
 
@@ -59,14 +65,19 @@ class ActsTableModel(QAbstractTableModel):
         self.endResetModel()
 
     def services_total(self, act: Act) -> Decimal:
+        if act.deleted:
+            return Decimal("0")
         total = Decimal("0")
         for row in act.services:
             if not row.deleted:
                 total += row.price * row.count * (Decimal("1") - row.discount / Decimal("100"))
         return total
 
-    def zero_total(self) -> Decimal:
-        return Decimal("0")
+    def _comments_text(self, act: Act) -> str:
+        if act.deleted:
+            comment = act.comments or ""
+            return f"Удален | {comment}" if comment else "Удален"
+        return act.comments or ""
 
     def _format_money(self, value: Decimal) -> str:
         return str(value.quantize(Decimal("0.01")))

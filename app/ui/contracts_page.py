@@ -143,13 +143,13 @@ class ContractsPage(QWidget):
         self._make_compact_combo(self.visibility_input, 90)
         self.visibility_input.currentIndexChanged.connect(lambda *_: self.reload())
 
-        self.create_button = self._toolbar_button("Создать", "Создать новый договор")
-        self.clone_button = self._toolbar_button("На основе", "Создать договор на основе выбранного")
-        self.edit_button = self._toolbar_button("Редактировать", "Редактировать выбранный договор")
-        self.open_button = self._toolbar_button("Открыть", "Открыть карточку выбранного договора")
-        self.delete_button = self._toolbar_button("Удалить", "Удалить выбранный договор")
-        self.refresh_button = self._toolbar_button("Обновить", "Обновить список договоров")
-        self.reset_filters_button = self._toolbar_button("Сбросить фильтры", "Сбросить все фильтры списка")
+        self.create_button = make_toolbar_button("Создать", "Создать новый договор")
+        self.clone_button = make_toolbar_button("На основе", "Создать договор на основе выбранного")
+        self.edit_button = make_toolbar_button("Редактировать", "Редактировать выбранный договор")
+        self.open_button = make_toolbar_button("Открыть", "Открыть карточку выбранного договора")
+        self.delete_button = make_toolbar_button("Удалить", "Удалить выбранный договор")
+        self.refresh_button = make_toolbar_button("Обновить", "Обновить список договоров")
+        self.reset_filters_button = make_toolbar_button("Сбросить фильтры", "Сбросить все фильтры списка")
         set_button_icon(self.create_button, ICON_NEW)
         set_button_icon(self.clone_button, ICON_CONTRACT)
         set_button_icon(self.edit_button, ICON_EDIT)
@@ -744,9 +744,6 @@ class ContractsPage(QWidget):
         self.params_layout.addWidget(self.balance_status_input, 0, 3)
         self.params_layout.addWidget(self.visibility_label, 0, 4)
         self.params_layout.addWidget(self.visibility_input, 0, 5)
-
-    def _toolbar_button(self, text: str, tooltip: str):
-        return make_toolbar_button(text, tooltip)
 
     def _sync_stacked_filter_columns(self) -> None:
         label_pairs = [

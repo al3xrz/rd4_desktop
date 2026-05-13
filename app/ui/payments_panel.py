@@ -30,10 +30,10 @@ class PaymentsPanel(QWidget):
         self.summary_label = QLabel("")
         self.summary_label.setStyleSheet("font-weight: 600; color: #334155;")
 
-        self.add_payment_button = self._toolbar_button("Оплата", "Добавить оплату")
-        self.add_refund_button = self._toolbar_button("Возврат", "Добавить возврат")
-        self.edit_button = self._toolbar_button("Редактировать", "Редактировать выбранный платеж")
-        self.unpost_button = self._toolbar_button("Распровести", "Распровести выбранный платеж")
+        self.add_payment_button = make_toolbar_button("Оплата", "Добавить оплату")
+        self.add_refund_button = make_toolbar_button("Возврат", "Добавить возврат")
+        self.edit_button = make_toolbar_button("Редактировать", "Редактировать выбранный платеж")
+        self.unpost_button = make_toolbar_button("Распровести", "Распровести выбранный платеж")
         set_button_icon(self.add_payment_button, ICON_NEW)
         set_button_icon(self.add_refund_button, ICON_REFUND)
         set_button_icon(self.edit_button, ICON_EDIT)
@@ -71,9 +71,6 @@ class PaymentsPanel(QWidget):
         self.setLayout(layout)
 
         self.reload()
-
-    def _toolbar_button(self, text: str, tooltip: str):
-        return make_toolbar_button(text, tooltip)
 
     def reload(self) -> None:
         self.model.set_payments(self.payment_service.list_payments(self.contract_id))
