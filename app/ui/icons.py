@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.ui.qt import QApplication, QBrush, QColor, QIcon, QPainter, QPen, QPixmap, Qt, QStyle
+from app.ui.qt import QApplication, QBrush, QColor, QDialogButtonBox, QIcon, QPainter, QPen, QPixmap, QSize, Qt, QStyle
 
 try:
     import qtawesome as qta
@@ -12,6 +12,7 @@ ICON_COLOR = "#334155"
 ICON_DANGER = "#b42318"
 ICON_SUCCESS = "#2e7d32"
 ICON_WARNING = "#a16207"
+DIALOG_ICON_SIZE = QSize(18, 18)
 
 
 def standard_icon(pixmap: int):
@@ -20,6 +21,23 @@ def standard_icon(pixmap: int):
 
 def set_button_icon(button, pixmap: int) -> None:
     button.setIcon(icon_for(pixmap))
+
+
+def set_dialog_button_icon(button, pixmap: int) -> None:
+    set_button_icon(button, pixmap)
+    button.setIconSize(DIALOG_ICON_SIZE)
+
+
+def set_dialog_button_icons(buttons: QDialogButtonBox) -> None:
+    icons = {
+        QDialogButtonBox.Save: ICON_SAVE,
+        QDialogButtonBox.Ok: ICON_OK,
+        QDialogButtonBox.Cancel: ICON_CANCEL,
+    }
+    for role, pixmap in icons.items():
+        button = buttons.button(role)
+        if button is not None:
+            set_dialog_button_icon(button, pixmap)
 
 
 def icon_for(pixmap: int):
@@ -44,6 +62,14 @@ def icon_for(pixmap: int):
         return _key_icon()
     if pixmap == ICON_CONTRACT:
         return _contract_icon()
+    if pixmap == ICON_SAVE:
+        return standard_icon(QStyle.SP_DialogSaveButton)
+    if pixmap == ICON_OK:
+        return standard_icon(QStyle.SP_DialogOkButton)
+    if pixmap == ICON_CANCEL:
+        return standard_icon(QStyle.SP_DialogCancelButton)
+    if pixmap == ICON_SAVE_PRINT:
+        return standard_icon(QStyle.SP_DialogSaveButton)
     return standard_icon(pixmap)
 
 
@@ -69,6 +95,10 @@ def _qtawesome_icon(pixmap: int) -> QIcon | None:
         ICON_SERVICE: ("fa5s.briefcase-medical", ICON_COLOR),
         ICON_SETTINGS: ("fa5s.cog", ICON_COLOR),
         ICON_USERS: ("fa5s.users", ICON_COLOR),
+        ICON_SAVE: ("fa5s.check", ICON_SUCCESS),
+        ICON_OK: ("fa5s.check-circle", ICON_SUCCESS),
+        ICON_CANCEL: ("fa5s.times-circle", ICON_DANGER),
+        ICON_SAVE_PRINT: ("fa5s.print", ICON_COLOR),
     }
     icon_name, color = icons.get(pixmap, ("", ""))
     if not icon_name:
@@ -240,3 +270,7 @@ ICON_REPORTS = -6
 ICON_SERVICE = -4
 ICON_SETTINGS = QStyle.SP_FileDialogListView
 ICON_USERS = -5
+ICON_SAVE = -11
+ICON_OK = -12
+ICON_CANCEL = -13
+ICON_SAVE_PRINT = -14

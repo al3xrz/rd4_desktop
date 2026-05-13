@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.models import ActMedService
+from app.ui.icons import set_dialog_button_icons
 from app.ui.qt import QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QLabel, QLineEdit, QVBoxLayout
 
 
@@ -35,6 +36,7 @@ class ActServiceRowDialog(QDialog):
         form.addRow("Комментарий", self.comments_input)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        set_dialog_button_icons(self.buttons)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
 

@@ -65,6 +65,9 @@ class ActsTableModel(QAbstractTableModel):
                 total += row.price * row.count * (Decimal("1") - row.discount / Decimal("100"))
         return total
 
+    def zero_total(self) -> Decimal:
+        return Decimal("0")
+
     def _format_money(self, value: Decimal) -> str:
         return str(value.quantize(Decimal("0.01")))
 

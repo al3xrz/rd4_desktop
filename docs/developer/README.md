@@ -21,6 +21,7 @@ services -> ui
 Подробности:
 
 - [ARCHITECTURE.md](../../ARCHITECTURE.md)
+- [Схема модулей и сигналов](module_signal_diagram.md)
 
 ## Окружение
 

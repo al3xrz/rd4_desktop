@@ -36,6 +36,8 @@ class ActsPanel(QWidget):
         self.docx_service = docx_service or DocxService()
         self.on_changed = on_changed
         self.model = ActsTableModel()
+        self.total_label = QLabel("")
+        self.total_label.setStyleSheet("font-weight: 600; color: #334155;")
         self.summary_label = QLabel("Выберите акт")
         self.summary_label.setStyleSheet("color: #666;")
         self.summary_label.setWordWrap(True)
@@ -83,6 +85,7 @@ class ActsPanel(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(toolbar)
+        layout.addWidget(self.total_label)
         layout.addWidget(self.table)
         layout.addWidget(self.summary_label)
         self.setLayout(layout)
@@ -95,7 +98,17 @@ class ActsPanel(QWidget):
 
     def reload(self) -> None:
         self.model.set_acts(self.act_service.list_acts(self.contract_id))
+        self._update_totals()
         self._update_selection()
+
+    def act_count(self) -> int:
+        return self.model.rowCount()
+
+    def _update_totals(self) -> None:
+        acts = self.model.acts
+        service_count = sum(sum(1 for row in act.services if not row.deleted) for act in acts)
+        total = sum((self.model.services_total(act) for act in acts), start=self.model.zero_total())
+        self.total_label.setText(f"Актов: {len(acts)} | Услуг: {service_count} | Сумма по актам: {total}")
 
     def _selected_act(self) -> Act | None:
         indexes = self.table.selectionModel().selectedRows()

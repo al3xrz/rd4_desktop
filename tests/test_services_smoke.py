@@ -12,6 +12,7 @@ def contract_payload(now):
     return {
         "contract_number": "C-001",
         "contract_date": now,
+        "category": "Категория 2",
         "patient_name": "Patient",
         "patient_birth_date": now,
         "patient_reg_address": "Registration address",
@@ -126,6 +127,50 @@ def test_services_enforce_business_rules(tmp_path, monkeypatch):
             {"number": "A-001", "date": now, "services": [{"med_service_id": folder.id}]},
             admin,
         )
+
+
+def test_act_service_rows_merge_same_service_and_discount(tmp_path, monkeypatch):
+    configure_temp_database(tmp_path, monkeypatch)
+
+    from app.services import ActService, AuthService, ContractService, MedServiceService
+
+    now = datetime.now(timezone.utc)
+    admin = AuthService().create_user({"username": "admin", "password": "secret", "role": "admin"})
+    contract = ContractService().create_contract(contract_payload(now), admin)
+    folder = MedServiceService().create_folder({"name": "Root"})
+    service = MedServiceService().create_service(
+        {
+            "parent_id": folder.id,
+            "code": "A01",
+            "name": "Consultation",
+            "unit": "шт",
+            "price": Decimal("100.00"),
+            "vat": 0,
+        }
+    )
+    acts = ActService()
+    act = acts.create_act(
+        contract.id,
+        {
+            "number": "A-001",
+            "date": now,
+            "services": [
+                {"med_service_id": service.id, "count": 1, "discount": Decimal("10.00")},
+                {"med_service_id": service.id, "count": 2, "discount": Decimal("10.00")},
+                {"med_service_id": service.id, "count": 1, "discount": Decimal("5.00")},
+            ],
+        },
+        admin,
+    )
+
+    rows = acts.list_service_rows(act.id)
+    assert len(rows) == 2
+    assert sorted((row.count, row.discount) for row in rows) == [(1, Decimal("5.00")), (3, Decimal("10.00"))]
+
+    acts.add_service(act.id, service.id, {"count": 4, "discount": Decimal("10.00")}, admin)
+    rows = acts.list_service_rows(act.id)
+    assert len(rows) == 2
+    assert sorted((row.count, row.discount) for row in rows) == [(1, Decimal("5.00")), (7, Decimal("10.00"))]
 
 
 def test_contract_soft_delete_cascades_to_payments_and_acts(tmp_path, monkeypatch):

@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from app.models import Act, User
 from app.services import ActService
 from app.services.exceptions import DomainError
 from app.ui.act_service_row_dialog import ActServiceRowDialog
 from app.ui.act_services_table_model import ActServicesTableModel
-from app.ui.icons import ICON_DELETE, ICON_EDIT, ICON_NEW, set_button_icon
+from app.ui.icons import (
+    ICON_DELETE,
+    ICON_EDIT,
+    ICON_NEW,
+    ICON_SAVE_PRINT,
+    set_button_icon,
+    set_dialog_button_icon,
+    set_dialog_button_icons,
+)
 from app.ui.med_service_picker_dialog import MedServicePickerDialog
 from app.ui.qt import (
     QAction,
@@ -83,6 +92,8 @@ class ActDialog(QDialog):
         self.buttons.button(QDialogButtonBox.Save).setText("Сохранить")
         self.buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
         self.save_print_button = QPushButton("Сохранить и распечатать")
+        set_dialog_button_icons(self.buttons)
+        set_dialog_button_icon(self.save_print_button, ICON_SAVE_PRINT)
         self.buttons.addButton(self.save_print_button, QDialogButtonBox.ActionRole)
         self.buttons.accepted.connect(self._save)
         self.buttons.rejected.connect(self.reject)
@@ -151,7 +162,7 @@ class ActDialog(QDialog):
             data["current_code"] = picker.selected_service.get("code", "") if picker.selected_service else ""
             data["current_name"] = picker.selected_service.get("name", "") if picker.selected_service else ""
             data["unit"] = picker.selected_service.get("unit", "") if picker.selected_service else ""
-            self.pending_services.append(data)
+            self._add_or_increment_pending_service(data)
             self._refresh_pending_rows()
             return
 
@@ -232,6 +243,20 @@ class ActDialog(QDialog):
         self.rows_model.set_rows(self.pending_services)
         self._update_pending_label()
         self._update_row_actions()
+
+    def _add_or_increment_pending_service(self, data: dict) -> None:
+        matching_row = self._find_pending_service(data["med_service_id"], data.get("discount"))
+        if matching_row is None:
+            self.pending_services.append(data)
+            return
+        matching_row["count"] = int(matching_row.get("count") or 0) + int(data.get("count") or 0)
+
+    def _find_pending_service(self, med_service_id: int, discount) -> dict | None:
+        expected_discount = Decimal(str(discount or 0))
+        for row in self.pending_services:
+            if row.get("med_service_id") == med_service_id and Decimal(str(row.get("discount") or 0)) == expected_discount:
+                return row
+        return None
 
     def _setup_shortcuts(self) -> None:
         add_action = QAction(self)

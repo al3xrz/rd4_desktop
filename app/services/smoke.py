@@ -40,6 +40,7 @@ def run_smoke() -> dict:
         {
             "contract_number": f"SMOKE-{suffix}",
             "contract_date": now,
+            "category": "Категория 2",
             "patient_name": "Smoke Patient",
             "patient_birth_date": now,
             "patient_reg_address": "Registration address",

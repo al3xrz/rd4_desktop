@@ -17,6 +17,7 @@ class ContractsTableModel(QAbstractTableModel):
         "Пациент",
         "Дата рождения",
         "История родов",
+        "Выписка",
         "Категория",
         "Телефон",
         "Тип оплаты",
@@ -49,13 +50,17 @@ class ContractsTableModel(QAbstractTableModel):
         contract = self.contracts[index.row()]
         if role == Qt.UserRole:
             return self._sort_value(contract, index.column())
+        if role == Qt.BackgroundRole and contract.discharged:
+            return self._discharged_balance_background(contract)
         if role == Qt.ForegroundRole and contract.deleted:
             return QBrush(QColor("#777777"))
-        if role == Qt.ForegroundRole and index.column() in {8, 9}:
+        if role == Qt.ForegroundRole and index.column() == 5 and contract.discharged:
+            return QBrush(QColor("#237a3b"))
+        if role == Qt.ForegroundRole and index.column() in {9, 10}:
             return self._status_brush(contract)
-        if role == Qt.FontRole and (contract.deleted or index.column() in {8, 9}):
+        if role == Qt.FontRole and (contract.deleted or index.column() in {5, 9, 10}):
             font = QFont()
-            font.setBold(index.column() in {8, 9})
+            font.setBold(index.column() in {5, 9, 10})
             font.setStrikeOut(contract.deleted)
             return font
         if role != Qt.DisplayRole:
@@ -66,6 +71,7 @@ class ContractsTableModel(QAbstractTableModel):
             contract.patient_name,
             self._date_text(contract.patient_birth_date),
             contract.birth_history_number or "",
+            self._discharge_text(contract),
             contract.category or "",
             contract.patient_phone or "",
             self._payment_type(contract),
@@ -114,6 +120,9 @@ class ContractsTableModel(QAbstractTableModel):
             return "Платно"
         return ""
 
+    def _discharge_text(self, contract: Contract) -> str:
+        return "Да" if contract.discharged else ""
+
     def _sort_value(self, contract: Contract, column: int):
         values = [
             contract.contract_number or "",
@@ -121,6 +130,7 @@ class ContractsTableModel(QAbstractTableModel):
             contract.patient_name or "",
             contract.patient_birth_date,
             contract.birth_history_number or "",
+            1 if contract.discharged else 0,
             contract.category or "",
             contract.patient_phone or "",
             self._payment_type(contract),
@@ -174,3 +184,11 @@ class ContractsTableModel(QAbstractTableModel):
         if status == "Оплачен":
             return QBrush(QColor("#237a3b"))
         return QBrush(QColor("#666666"))
+
+    def _discharged_balance_background(self, contract: Contract):
+        status = self._status_text(contract)
+        if status == "Долг":
+            return QBrush(QColor("#fdecec"))
+        if status == "Переплата":
+            return QBrush(QColor("#edf3ff"))
+        return None

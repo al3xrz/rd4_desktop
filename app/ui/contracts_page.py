@@ -91,6 +91,7 @@ class ContractsPage(QWidget):
         self.last_focused_contract_id: int | None = None
         self._updating_period_controls = False
         self._filters_stacked = False
+        self._select_last_on_next_filter = True
 
         self.title_label = QLabel("Договоры")
         self.title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
@@ -246,11 +247,12 @@ class ContractsPage(QWidget):
         self.table.setColumnWidth(2, 230)
         self.table.setColumnWidth(3, 110)
         self.table.setColumnWidth(4, 120)
-        self.table.setColumnWidth(5, 140)
-        self.table.setColumnWidth(6, 145)
-        self.table.setColumnWidth(7, 110)
-        self.table.setColumnWidth(8, 100)
-        self.table.setColumnWidth(9, 105)
+        self.table.setColumnWidth(5, 72)
+        self.table.setColumnWidth(6, 140)
+        self.table.setColumnWidth(7, 145)
+        self.table.setColumnWidth(8, 110)
+        self.table.setColumnWidth(9, 100)
+        self.table.setColumnWidth(10, 105)
 
         self.summary_label = QLabel("")
         self.summary_label.setStyleSheet("font-weight: 600;")
@@ -304,7 +306,11 @@ class ContractsPage(QWidget):
         ]
 
         self.model.set_contracts(contracts, self.summaries)
-        self._restore_focus()
+        if self._select_last_on_next_filter:
+            self._select_last_visible_contract()
+            self._select_last_on_next_filter = False
+        else:
+            self._restore_focus()
         self.summary_label.setText(
             f"Показано: {len(contracts)} из {len(self.contracts)}" if self._has_active_filters() else f"Всего договоров: {len(contracts)}"
         )
@@ -507,9 +513,10 @@ class ContractsPage(QWidget):
             return
 
         deleted_text = " | удален" if contract.deleted else ""
+        discharged_text = " | выписана" if contract.discharged else ""
         detail = (
             f"{contract.contract_number} | {contract.patient_name} | тел.: {contract.patient_phone or '-'} | "
-            f"история родов: {contract.birth_history_number or '-'} | {self._payment_type(contract)}{deleted_text}"
+            f"история родов: {contract.birth_history_number or '-'}{discharged_text} | {self._payment_type(contract)}{deleted_text}"
         )
         summary = self.summaries.get(contract.id)
         if summary:
@@ -537,6 +544,24 @@ class ContractsPage(QWidget):
             return
         self.table.selectRow(proxy_index.row())
         self.table.scrollTo(proxy_index, QTableView.PositionAtCenter)
+        self.table.setCurrentIndex(proxy_index)
+        self.table.setFocus(Qt.OtherFocusReason)
+
+    def _select_last_visible_contract(self) -> None:
+        """Select and scroll to the last visible contract on initial page load."""
+        last_row = self.proxy_model.rowCount() - 1
+        if last_row < 0:
+            self._update_selection()
+            return
+        proxy_index = self.proxy_model.index(last_row, 0)
+        if not proxy_index.isValid():
+            self._update_selection()
+            return
+        source_index = self.proxy_model.mapToSource(proxy_index)
+        contract = self.model.contract_at(source_index.row())
+        self.last_focused_contract_id = contract.id if contract is not None else None
+        self.table.selectRow(last_row)
+        self.table.scrollTo(proxy_index, QTableView.PositionAtBottom)
         self.table.setCurrentIndex(proxy_index)
         self.table.setFocus(Qt.OtherFocusReason)
 

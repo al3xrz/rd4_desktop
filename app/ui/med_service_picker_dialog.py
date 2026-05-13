@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.models import MedService
 from app.services import MedServiceService
-from app.ui.icons import ICON_FOLDER, ICON_SERVICE, icon_for
+from app.ui.icons import ICON_FOLDER, ICON_SERVICE, icon_for, set_dialog_button_icons
 from app.ui.qt import (
     QDialog,
     QDialogButtonBox,
@@ -52,6 +52,7 @@ class MedServicePickerDialog(QDialog):
         self.details_label.setWordWrap(True)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        set_dialog_button_icons(self.buttons)
         self.buttons.accepted.connect(self._accept_selected)
         self.buttons.rejected.connect(self.reject)
         self.ok_button = self.buttons.button(QDialogButtonBox.Ok)

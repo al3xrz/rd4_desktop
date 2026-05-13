@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.ui.icons import set_dialog_button_icons
 from app.ui.qt import QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QVBoxLayout
 
 
@@ -15,6 +16,7 @@ class UnpostPaymentDialog(QDialog):
         form.addRow("Причина", self.reason_input)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        set_dialog_button_icons(self.buttons)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
 

@@ -48,6 +48,7 @@ def test_models_relationships_smoke(tmp_path, monkeypatch):
         contract = Contract(
             contract_number="C-001",
             contract_date=now,
+            category="Категория 2",
             patient_name="Patient",
             patient_birth_date=now,
             patient_reg_address="Registration address",

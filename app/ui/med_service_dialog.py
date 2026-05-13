@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from app.models import MedService
 from app.services import MedServiceService
-from app.ui.icons import ICON_FOLDER, icon_for
+from app.ui.icons import ICON_FOLDER, icon_for, set_dialog_button_icons
 from app.ui.qt import (
     QComboBox,
     QDialog,
@@ -105,6 +105,7 @@ class MedServiceDialog(QDialog):
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         self.buttons.button(QDialogButtonBox.Save).setText("Сохранить")
         self.buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        set_dialog_button_icons(self.buttons)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
 

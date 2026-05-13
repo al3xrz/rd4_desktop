@@ -28,6 +28,7 @@ from app.ui.qt import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QStackedWidget,
@@ -133,6 +134,13 @@ class MainWindow(QMainWindow):
         templates_action.triggered.connect(lambda: self._open_path(get_resource_path("app", "templates", "docx")))
         settings_menu.addAction(templates_action)
 
+        self.menuBar().addMenu("Отчеты")
+
+        help_menu = self.menuBar().addMenu("Помощь")
+        about_action = QAction("О программе", self)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
+
     def _set_page(self, index: int) -> None:
         if index >= 0:
             self.pages.setCurrentIndex(index)
@@ -189,6 +197,18 @@ class MainWindow(QMainWindow):
             subprocess.Popen(["open", str(path)])
             return
         subprocess.Popen(["xdg-open", str(path)])
+
+    def _show_about(self) -> None:
+        QMessageBox.about(
+            self,
+            "О программе",
+            (
+                "Роддом №4\n\n"
+                "Standalone desktop-приложение для ведения договоров, платежей, актов и справочников.\n\n"
+                f"Пользователь: {self.current_user.username}\n"
+                f"База данных: {settings.database_path}"
+            ),
+        )
 
     def _has_role(self, role: str) -> bool:
         current_role = getattr(self.current_user.role, "value", self.current_user.role)

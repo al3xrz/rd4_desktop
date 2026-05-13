@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from app.models import Payment, User
 from app.services import PaymentService
 from app.services.exceptions import DomainError
 from app.ui.icons import ICON_DELETE, ICON_EDIT, ICON_NEW, ICON_REFUND, set_button_icon
 from app.ui.payment_dialog import PaymentDialog
 from app.ui.payments_table_model import PaymentsTableModel
-from app.ui.qt import QMessageBox, QHeaderView, QTableView, QVBoxLayout, QWidget
+from app.ui.qt import QLabel, QMessageBox, QHeaderView, QTableView, QVBoxLayout, QWidget
 from app.ui.toolbars import make_toolbar, make_toolbar_button
 from app.ui.unpost_payment_dialog import UnpostPaymentDialog
 
@@ -25,6 +27,8 @@ class PaymentsPanel(QWidget):
         self.payment_service = payment_service or PaymentService()
         self.on_changed = on_changed
         self.model = PaymentsTableModel()
+        self.summary_label = QLabel("")
+        self.summary_label.setStyleSheet("font-weight: 600; color: #334155;")
 
         self.add_payment_button = self._toolbar_button("Оплата", "Добавить оплату")
         self.add_refund_button = self._toolbar_button("Возврат", "Добавить возврат")
@@ -62,6 +66,7 @@ class PaymentsPanel(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(toolbar)
+        layout.addWidget(self.summary_label)
         layout.addWidget(self.table)
         self.setLayout(layout)
 
@@ -72,6 +77,21 @@ class PaymentsPanel(QWidget):
 
     def reload(self) -> None:
         self.model.set_payments(self.payment_service.list_payments(self.contract_id))
+        self._update_summary()
+
+    def payment_count(self) -> int:
+        return self.model.rowCount()
+
+    def _update_summary(self) -> None:
+        payments = self.model.payments
+        posted_payments = [payment for payment in payments if payment.posted]
+        incoming = sum((payment.amount for payment in posted_payments if payment.amount > 0), Decimal("0"))
+        refunds = sum((payment.amount for payment in posted_payments if payment.amount < 0), Decimal("0"))
+        total = incoming + refunds
+        unposted_count = sum(1 for payment in payments if not payment.posted)
+        self.summary_label.setText(
+            f"Оплаты: {incoming} | Возвраты: {refunds} | Итого: {total} | Распроведено: {unposted_count}"
+        )
 
     def _selected_payment(self) -> Payment | None:
         indexes = self.table.selectionModel().selectedRows()

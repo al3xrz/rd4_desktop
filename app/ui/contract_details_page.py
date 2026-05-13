@@ -34,6 +34,9 @@ class ContractDetailsPage(QWidget):
         self.title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
         self.patient_label = QLabel("")
         self.summary_label = QLabel("")
+        self.summary_label.setStyleSheet(
+            "QLabel { background: #f8fafc; border: 1px solid #d8e2ef; border-radius: 6px; padding: 8px 10px; }"
+        )
 
         self.print_contract_button = QPushButton("Печать договора")
         self.edit_button = QPushButton("Редактировать")
@@ -75,15 +78,46 @@ class ContractDetailsPage(QWidget):
         self._render_header(contract, summary)
         self.payments_panel.reload()
         self.acts_panel.reload()
+        self._update_tab_titles()
 
     def _render_header(self, contract: Contract, summary: dict) -> None:
         self.title_label.setText(f"Договор {contract.contract_number}")
-        self.patient_label.setText(f"{contract.patient_name} | {contract.patient_phone}")
+        discharged = " | выписана" if contract.discharged else ""
+        self.patient_label.setText(f"{contract.patient_name} | {contract.patient_phone}{discharged}")
+        summary_text = dict(summary)
+        summary_text["status"] = self._status_text(summary.get("status"))
         self.summary_label.setText(
-            "Услуги: {services_total} | Платежи: {payments_total} | Баланс: {balance} | Статус: {status}".format(
-                **summary
+            "Начислено: {services_total} | Оплачено: {payments_total} | Возвраты: {refunds_total} | "
+            "Баланс: {balance} | Статус: {status}".format(**summary_text)
+        )
+        self.summary_label.setStyleSheet(
+            "QLabel {{ background: {background}; border: 1px solid {border}; border-radius: 6px; "
+            "padding: 8px 10px; color: {color}; font-weight: 600; }}".format(
+                **self._summary_colors(summary.get("status"))
             )
         )
+
+    def _summary_colors(self, status: str | None) -> dict[str, str]:
+        if status == "debt":
+            return {"background": "#fff5f5", "border": "#f5b5b5", "color": "#b00020"}
+        if status == "overpaid":
+            return {"background": "#f3f7ff", "border": "#b9cdfa", "color": "#2f5fb3"}
+        if status == "paid":
+            return {"background": "#f2fbf5", "border": "#b8e1c4", "color": "#237a3b"}
+        return {"background": "#f8fafc", "border": "#d8e2ef", "color": "#334155"}
+
+    def _status_text(self, status: str | None) -> str:
+        if status == "debt":
+            return "Долг"
+        if status == "overpaid":
+            return "Переплата"
+        if status == "paid":
+            return "Оплачен"
+        return ""
+
+    def _update_tab_titles(self) -> None:
+        self.tabs.setTabText(0, f"Платежи ({self.payments_panel.payment_count()})")
+        self.tabs.setTabText(1, f"Акты ({self.acts_panel.act_count()})")
 
     def _placeholder(self, text: str) -> QWidget:
         widget = QWidget()

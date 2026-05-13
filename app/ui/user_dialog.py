@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.models import Role, User
+from app.ui.icons import set_dialog_button_icons
 from app.ui.qt import (
     QCheckBox,
     QComboBox,
@@ -91,6 +92,7 @@ class UserDialog(QDialog):
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         self.buttons.button(QDialogButtonBox.Save).setText("Сохранить")
         self.buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        set_dialog_button_icons(self.buttons)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
 

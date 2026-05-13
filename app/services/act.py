@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from app.core.database import session_scope
 from app.models import Act, ActMedService, User
@@ -30,7 +31,7 @@ class ActService:
             rows = ActMedServiceRepository(session)
             med_services = MedServiceRepository(session)
             for service_data in services_data:
-                rows.create(**self._build_service_row(med_services, act, service_data))
+                self._add_or_increment_service_row(rows, med_services, act, service_data)
 
             return act
 
@@ -65,9 +66,8 @@ class ActService:
             if act is None:
                 raise NotFoundError(f"Act not found: {act_id}")
             med_services = MedServiceRepository(session)
-            return ActMedServiceRepository(session).create(
-                **self._build_service_row(med_services, act, {"med_service_id": med_service_id, **data})
-            )
+            rows = ActMedServiceRepository(session)
+            return self._add_or_increment_service_row(rows, med_services, act, {"med_service_id": med_service_id, **data})
 
     def update_service_row(self, row_id: int, data: dict, current_user: User | None = None) -> ActMedService:
         immutable = {"current_code", "current_name", "unit", "med_service_id"}
@@ -119,3 +119,35 @@ class ActService:
             "count": data.get("count", 1),
             "comments": data.get("comments"),
         }
+
+    def _add_or_increment_service_row(
+        self,
+        rows: ActMedServiceRepository,
+        med_services: MedServiceRepository,
+        act: Act,
+        data: dict,
+    ) -> ActMedService:
+        payload = self._build_service_row(med_services, act, data)
+        matching_row = self._find_matching_service_row(
+            rows.list_for_act(act.id),
+            data["med_service_id"],
+            payload["discount"],
+        )
+        if matching_row is None:
+            return rows.create(**payload)
+
+        matching_row.count = int(matching_row.count or 0) + int(payload["count"] or 0)
+        rows.session.flush()
+        return matching_row
+
+    def _find_matching_service_row(
+        self,
+        rows: list[ActMedService],
+        med_service_id: int,
+        discount,
+    ) -> ActMedService | None:
+        expected_discount = Decimal(str(discount or 0))
+        for row in rows:
+            if row.med_service_id == med_service_id and Decimal(str(row.discount or 0)) == expected_discount:
+                return row
+        return None

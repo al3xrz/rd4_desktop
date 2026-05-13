@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from app.models import Payment
+from app.ui.icons import set_dialog_button_icons
 from app.ui.qt import QDateTime, QDateTimeEdit, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QLineEdit, QVBoxLayout
 
 
@@ -30,6 +31,7 @@ class PaymentDialog(QDialog):
         form.addRow("Комментарий", self.comments_input)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        set_dialog_button_icons(self.buttons)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
 

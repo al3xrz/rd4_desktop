@@ -91,22 +91,25 @@ def test_docx_act_ticket_rejects_more_than_eight_services(tmp_path, monkeypatch)
     admin = AuthService().create_user({"username": "admin", "password": "secret", "role": Role.ADMIN})
     contract = ContractService().create_contract(contract_payload(now), admin)
     folder = MedServiceService().create_folder({"name": "Root"})
-    service = MedServiceService().create_service(
-        {
-            "parent_id": folder.id,
-            "code": "A01",
-            "name": "Consultation",
-            "unit": "шт",
-            "price": Decimal("100.00"),
-            "vat": 0,
-        }
-    )
+    services = [
+        MedServiceService().create_service(
+            {
+                "parent_id": folder.id,
+                "code": f"A{index:02d}",
+                "name": f"Consultation {index}",
+                "unit": "шт",
+                "price": Decimal("100.00"),
+                "vat": 0,
+            }
+        )
+        for index in range(9)
+    ]
     act = ActService().create_act(
         contract.id,
         {
             "number": "A-001",
             "date": now,
-            "services": [{"med_service_id": service.id} for _ in range(9)],
+            "services": [{"med_service_id": service.id} for service in services],
         },
         admin,
     )
