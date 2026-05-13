@@ -40,6 +40,7 @@ flowchart TB
     userspage --> auth
     userdialog --> auth
     mainwindow --> docx["DocxService"]
+    mainwindow --> reportservice["ReportService"]
     details --> docx
     acts --> docx
 
@@ -52,6 +53,7 @@ flowchart TB
     auth --> userrepo["UserRepository"]
     docx --> contractservice
     docx --> actservice
+    reportservice --> actrowrepo
 
     contractrepo --> models["app.models<br/>Contract, Payment, Act, ActMedService, MedService, User"]
     paymentrepo --> models
@@ -127,4 +129,3 @@ flowchart LR
     service --> domainerr["DomainError"]
     domainerr --> uierr["UI показывает QMessageBox.warning"]
 ```
-

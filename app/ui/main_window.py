@@ -3,28 +3,41 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from datetime import datetime, time, timezone
 from pathlib import Path
 
 from app.core.config import settings
 from app.core.paths import get_resource_path
 from app.models import User
+from app.services import ReportService
+from app.services.exceptions import DomainError
 from app.ui.contract_details_page import ContractDetailsPage
 from app.ui.contracts_page import ContractsPage
 from app.ui.med_services_page import MedServicesPage
 from app.ui.icons import (
+    ICON_ABOUT,
     ICON_BACK,
     ICON_CONTRACT,
     ICON_EXIT,
+    ICON_FINANCIAL_REPORT,
+    ICON_MATRIX_REPORT,
     ICON_NEW,
     ICON_REFRESH,
+    ICON_REPORTS,
     ICON_SERVICE,
     ICON_USERS,
     icon_for,
     set_button_icon,
+    set_dialog_button_icons,
 )
 from app.ui.qt import (
     QAction,
+    QDateTime,
+    QDateTimeEdit,
+    QDialog,
+    QDialogButtonBox,
     QFrame,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -134,10 +147,19 @@ class MainWindow(QMainWindow):
         templates_action.triggered.connect(lambda: self._open_path(get_resource_path("app", "templates", "docx")))
         settings_menu.addAction(templates_action)
 
-        self.menuBar().addMenu("Отчеты")
+        reports_menu = self.menuBar().addMenu("Отчеты")
+        services_report_action = QAction(icon_for(ICON_REPORTS), "Отчет по услугам за период", self)
+        services_report_action.triggered.connect(self._render_services_report)
+        reports_menu.addAction(services_report_action)
+        financial_report_action = QAction(icon_for(ICON_FINANCIAL_REPORT), "Финансовый отчет за период", self)
+        financial_report_action.triggered.connect(self._render_financial_report)
+        reports_menu.addAction(financial_report_action)
+        services_matrix_report_action = QAction(icon_for(ICON_MATRIX_REPORT), "Свод по услугам за период", self)
+        services_matrix_report_action.triggered.connect(self._render_services_matrix_report)
+        reports_menu.addAction(services_matrix_report_action)
 
         help_menu = self.menuBar().addMenu("Помощь")
-        about_action = QAction("О программе", self)
+        about_action = QAction(icon_for(ICON_ABOUT), "О программе", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
@@ -210,6 +232,93 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _render_services_report(self) -> None:
+        dialog = ReportPeriodDialog("Отчет по услугам за период", self)
+        if dialog.exec_() != ReportPeriodDialog.Accepted:
+            return
+        if dialog.date_from() > dialog.date_to():
+            QMessageBox.warning(self, "Роддом №4", "Дата начала периода не должна быть позже даты окончания.")
+            return
+        try:
+            report_service = ReportService()
+            path = report_service.render_services_report(dialog.date_from(), dialog.date_to())
+            report_service.open_report(path)
+        except DomainError as exc:
+            QMessageBox.warning(self, "Роддом №4", str(exc))
+
+    def _render_financial_report(self) -> None:
+        dialog = ReportPeriodDialog("Финансовый отчет за период", self)
+        if dialog.exec_() != ReportPeriodDialog.Accepted:
+            return
+        if dialog.date_from() > dialog.date_to():
+            QMessageBox.warning(self, "Роддом №4", "Дата начала периода не должна быть позже даты окончания.")
+            return
+        try:
+            report_service = ReportService()
+            path = report_service.render_financial_report(dialog.date_from(), dialog.date_to())
+            report_service.open_report(path)
+        except DomainError as exc:
+            QMessageBox.warning(self, "Роддом №4", str(exc))
+
+    def _render_services_matrix_report(self) -> None:
+        dialog = ReportPeriodDialog("Свод по услугам за период", self)
+        if dialog.exec_() != ReportPeriodDialog.Accepted:
+            return
+        if dialog.date_from() > dialog.date_to():
+            QMessageBox.warning(self, "Роддом №4", "Дата начала периода не должна быть позже даты окончания.")
+            return
+        try:
+            report_service = ReportService()
+            path = report_service.render_services_matrix_report(dialog.date_from(), dialog.date_to())
+            report_service.open_report(path)
+        except DomainError as exc:
+            QMessageBox.warning(self, "Роддом №4", str(exc))
+
     def _has_role(self, role: str) -> bool:
         current_role = getattr(self.current_user.role, "value", self.current_user.role)
         return current_role == role
+
+
+class ReportPeriodDialog(QDialog):
+    def __init__(self, title: str, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(360)
+
+        today = datetime.now().date()
+        self.date_from_input = self._date_input(datetime.combine(today, time.min, tzinfo=timezone.utc))
+        self.date_to_input = self._date_input(datetime.combine(today, time.min, tzinfo=timezone.utc))
+
+        form = QFormLayout()
+        form.addRow("С", self.date_from_input)
+        form.addRow("По", self.date_to_input)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.button(QDialogButtonBox.Ok).setText("Сформировать")
+        self.buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        set_dialog_button_icons(self.buttons)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addLayout(form)
+        layout.addWidget(self.buttons)
+        self.setLayout(layout)
+
+    def date_from(self) -> datetime:
+        return self._to_datetime(self.date_from_input)
+
+    def date_to(self) -> datetime:
+        return self._to_datetime(self.date_to_input)
+
+    def _date_input(self, value: datetime) -> QDateTimeEdit:
+        widget = QDateTimeEdit()
+        widget.setCalendarPopup(True)
+        widget.setDisplayFormat("dd.MM.yyyy")
+        widget.setDateTime(QDateTime(value))
+        return widget
+
+    def _to_datetime(self, widget: QDateTimeEdit) -> datetime:
+        qt_value = widget.date()
+        converter = getattr(qt_value, "toPyDate", None) or getattr(qt_value, "toPython")
+        return datetime.combine(converter(), time.min, tzinfo=timezone.utc)

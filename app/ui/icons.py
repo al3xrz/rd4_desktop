@@ -56,6 +56,12 @@ def icon_for(pixmap: int):
         return _users_icon()
     if pixmap == ICON_REPORTS:
         return _reports_icon()
+    if pixmap == ICON_FINANCIAL_REPORT:
+        return _financial_report_icon()
+    if pixmap == ICON_MATRIX_REPORT:
+        return _matrix_report_icon()
+    if pixmap == ICON_ABOUT:
+        return standard_icon(QStyle.SP_MessageBoxInformation)
     if pixmap == ICON_EXIT:
         return _exit_icon()
     if pixmap == ICON_PASSWORD:
@@ -91,13 +97,16 @@ def _qtawesome_icon(pixmap: int) -> QIcon | None:
         ICON_REFRESH: ("fa5s.sync-alt", ICON_COLOR),
         ICON_RESET: ("fa5s.eraser", ICON_COLOR),
         ICON_REFUND: ("fa5s.undo-alt", ICON_WARNING),
-        ICON_REPORTS: ("fa5s.chart-bar", ICON_COLOR),
+        ICON_REPORTS: ("fa5s.file-alt", ICON_COLOR),
+        ICON_FINANCIAL_REPORT: ("fa5s.file-invoice-dollar", ICON_SUCCESS),
+        ICON_MATRIX_REPORT: ("fa5s.table", ICON_COLOR),
+        ICON_ABOUT: ("fa5s.info-circle", ICON_COLOR),
         ICON_SERVICE: ("fa5s.briefcase-medical", ICON_COLOR),
         ICON_SETTINGS: ("fa5s.cog", ICON_COLOR),
         ICON_USERS: ("fa5s.users", ICON_COLOR),
-        ICON_SAVE: ("fa5s.check", ICON_SUCCESS),
-        ICON_OK: ("fa5s.check-circle", ICON_SUCCESS),
-        ICON_CANCEL: ("fa5s.times-circle", ICON_DANGER),
+        ICON_SAVE: ("fa5s.save", ICON_SUCCESS),
+        ICON_OK: ("fa5s.check", ICON_SUCCESS),
+        ICON_CANCEL: ("fa5s.times", ICON_DANGER),
         ICON_SAVE_PRINT: ("fa5s.print", ICON_COLOR),
     }
     icon_name, color = icons.get(pixmap, ("", ""))
@@ -207,6 +216,39 @@ def _reports_icon() -> QIcon:
     return QIcon(pixmap)
 
 
+def _financial_report_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#2e7d32"), 1))
+    painter.setBrush(QBrush(QColor("#e7f6e7")))
+    painter.drawRoundedRect(5, 3, 14, 18, 2, 2)
+    painter.setPen(QPen(QColor("#2e7d32"), 2))
+    painter.drawLine(8, 9, 16, 9)
+    painter.drawLine(8, 13, 16, 13)
+    painter.setPen(QPen(QColor("#2e7d32"), 1))
+    painter.drawEllipse(9, 15, 6, 3)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _matrix_report_icon() -> QIcon:
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor("#334155"), 1))
+    painter.setBrush(QBrush(QColor("#f1f5f9")))
+    painter.drawRoundedRect(4, 5, 16, 14, 2, 2)
+    painter.drawLine(4, 10, 20, 10)
+    painter.drawLine(4, 14, 20, 14)
+    painter.drawLine(9, 5, 9, 19)
+    painter.drawLine(15, 5, 15, 19)
+    painter.end()
+    return QIcon(pixmap)
+
+
 def _exit_icon() -> QIcon:
     pixmap = QPixmap(24, 24)
     pixmap.fill(Qt.transparent)
@@ -254,10 +296,12 @@ def _contract_icon() -> QIcon:
 
 
 ICON_BACK = QStyle.SP_ArrowBack
+ICON_ABOUT = -15
 ICON_CONTRACT = -8
 ICON_DELETE = QStyle.SP_TrashIcon
 ICON_EDIT = -2
 ICON_EXIT = -7
+ICON_FINANCIAL_REPORT = -16
 ICON_FOLDER = -3
 ICON_NEW = QStyle.SP_FileIcon
 ICON_OPEN = QStyle.SP_DialogOpenButton
@@ -267,6 +311,7 @@ ICON_REFRESH = QStyle.SP_BrowserReload
 ICON_RESET = QStyle.SP_DialogResetButton
 ICON_REFUND = -10
 ICON_REPORTS = -6
+ICON_MATRIX_REPORT = -17
 ICON_SERVICE = -4
 ICON_SETTINGS = QStyle.SP_FileDialogListView
 ICON_USERS = -5

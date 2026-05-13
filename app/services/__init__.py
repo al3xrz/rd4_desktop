@@ -6,6 +6,7 @@ from app.services.contract import ContractService
 from app.services.docx import DocxService
 from app.services.med_service import MedServiceService
 from app.services.payment import PaymentService
+from app.services.report import ReportService
 
 __all__ = [
     "ActService",
@@ -14,4 +15,5 @@ __all__ = [
     "DocxService",
     "MedServiceService",
     "PaymentService",
+    "ReportService",
 ]
