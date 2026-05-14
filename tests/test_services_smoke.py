@@ -261,17 +261,70 @@ def test_act_save_options_create_payment_and_mark_contract_discharged(tmp_path, 
 
     ActService().delete_act(act.id, admin)
     deleted_act = ActService().list_acts(contract.id)[0]
+    deleted_payment = [
+        payment for payment in PaymentService().list_payments(contract.id) if payment.comments.startswith("Удален при удалении акта")
+    ][0]
     assert deleted_act.id == act.id
     assert deleted_act.deleted is True
+    assert deleted_payment.deleted is True
+    assert deleted_payment.comments.startswith(f"Удален при удалении акта {act.number} ")
+    deleted_rows = ActService().list_service_rows(act.id)
+    assert deleted_rows
+    assert all(row.deleted for row in deleted_rows)
 
     with session_scope() as session:
-        deleted_payments = session.query(Payment).filter_by(comments=f"Платеж по акту {act.number}").all()
+        deleted_payments = session.query(Payment).filter(Payment.comments.like(f"Удален при удалении акта {act.number} %")).all()
         rows = session.query(ActMedService).filter_by(act_id=act.id).all()
         assert deleted_payments
         assert all(payment.deleted for payment in deleted_payments)
         assert rows
         assert all(row.deleted for row in rows)
         assert session.get(Act, act.id).deleted is True
+
+
+def test_existing_act_can_be_paid_once(tmp_path, monkeypatch):
+    configure_temp_database(tmp_path, monkeypatch)
+
+    from app.services import ActService, AuthService, ContractService, MedServiceService, PaymentService
+    from app.services.exceptions import BusinessRuleError
+
+    now = datetime.now(timezone.utc)
+    admin = AuthService().create_user({"username": "admin", "password": "secret", "role": "admin"})
+    contract_payload_data = contract_payload(now)
+    contract_payload_data["prepay_inpatient_treatment"] = Decimal("0")
+    contract = ContractService().create_contract(contract_payload_data, admin)
+    folder = MedServiceService().create_folder({"name": "Root"})
+    service = MedServiceService().create_service(
+        {
+            "parent_id": folder.id,
+            "code": "A01",
+            "name": "Consultation",
+            "unit": "шт",
+            "price": Decimal("100.00"),
+            "vat": 0,
+        }
+    )
+
+    acts = ActService()
+    act = acts.create_act(
+        contract.id,
+        {
+            "number": "A-PAY",
+            "date": now,
+            "services": [{"med_service_id": service.id, "count": 2, "discount": Decimal("10.00")}],
+        },
+        admin,
+    )
+
+    payment = acts.pay_act(act.id, admin)
+    payments = PaymentService().list_payments(contract.id)
+    act_payments = [item for item in payments if item.comments == f"Платеж по акту {act.number}"]
+    assert payment.amount == Decimal("180.00")
+    assert len(act_payments) == 1
+    assert acts.is_act_paid(act.id) is True
+
+    with pytest.raises(BusinessRuleError):
+        acts.pay_act(act.id, admin)
 
 
 def test_contract_soft_delete_cascades_to_payments_and_acts(tmp_path, monkeypatch):

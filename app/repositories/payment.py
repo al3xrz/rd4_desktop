@@ -19,7 +19,7 @@ class PaymentRepository(BaseRepository[Payment]):
     def list_posted_by_contract_and_comment(self, contract_id: int, comment: str) -> list[Payment]:
         stmt = select(Payment).where(
             Payment.contract_id == contract_id,
-            Payment.comments == comment,
+            Payment.comments.like(f"{comment}%"),
             Payment.deleted.is_(False),
             Payment.posted.is_(True),
         )

@@ -166,6 +166,8 @@ class ActDialog(QDialog):
     def _is_read_only_act(self, act: Act | None) -> bool:
         if act is None:
             return False
+        if act.deleted:
+            return True
         try:
             return self.act_service.is_act_paid(act.id)
         except DomainError:

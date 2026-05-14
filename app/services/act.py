@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from app.core.database import session_scope
-from app.models import Act, ActMedService, User
+from app.models import Act, ActMedService, Payment, User
 from app.repositories import (
     ActMedServiceRepository,
     ActRepository,
@@ -93,9 +93,24 @@ class ActService:
                 raise NotFoundError(f"Act not found: {act_id}")
             for row in rows.list_for_act(act_id):
                 row.deleted = True
+            delete_comment = self._act_delete_payment_comment(act.number)
             for payment in self._act_payments(payments, act):
                 payment.deleted = True
+                payment.comments = delete_comment
             acts.soft_delete(act_id)
+
+    def pay_act(self, act_id: int, current_user: User) -> Payment:
+        with session_scope() as session:
+            current_user = session.merge(current_user)
+            acts = ActRepository(session)
+            rows = ActMedServiceRepository(session)
+            payments = PaymentRepository(session)
+            act = acts.get(act_id)
+            if act is None:
+                raise NotFoundError(f"Act not found: {act_id}")
+            if self._has_act_payment(payments, act):
+                raise BusinessRuleError("По этому акту уже создан платеж. Акт доступен только для просмотра.")
+            return self._create_act_payment(act, rows, payments, current_user)
 
     def add_service(self, act_id: int, med_service_id: int, data: dict, current_user: User | None = None) -> ActMedService:
         with session_scope() as session:
@@ -144,10 +159,10 @@ class ActService:
 
     def list_service_rows(self, act_id: int) -> list[ActMedService]:
         with session_scope() as session:
-            act = ActRepository(session).get(act_id)
+            act = ActRepository(session).get(act_id, include_deleted=True)
             if act is None:
                 raise NotFoundError(f"Act not found: {act_id}")
-            return ActMedServiceRepository(session).list_for_act(act_id)
+            return ActMedServiceRepository(session).list_for_act(act_id, include_deleted=act.deleted)
 
     def next_act_number(self, contract_id: int) -> str:
         with session_scope() as session:
@@ -204,16 +219,7 @@ class ActService:
                 raise ValidationError("Current user is required to create payment by act.")
             if self._has_act_payment(PaymentRepository(rows.session), act):
                 raise BusinessRuleError("По этому акту уже создан платеж. Акт доступен только для просмотра.")
-            amount = self._act_total(rows.list_for_act(act.id))
-            if amount <= 0:
-                raise ValidationError("Act payment amount must be positive.")
-            PaymentRepository(rows.session).create(
-                contract=act.contract,
-                user=current_user,
-                date=act.date,
-                amount=amount,
-                comments=self._payment_comment(act.number),
-            )
+            self._create_act_payment(act, rows, PaymentRepository(rows.session), current_user)
 
         if mark_discharged:
             rows.session.flush()
@@ -233,6 +239,28 @@ class ActService:
 
     def _payment_comment(self, act_number: str) -> str:
         return f"Платеж по акту {act_number}"
+
+    def _act_delete_payment_comment(self, act_number: str) -> str:
+        deleted_at = datetime.now(timezone.utc).astimezone().strftime("%d.%m.%Y %H:%M")
+        return f"Удален при удалении акта {act_number} {deleted_at}"
+
+    def _create_act_payment(
+        self,
+        act: Act,
+        rows: ActMedServiceRepository,
+        payments: PaymentRepository,
+        current_user: User,
+    ) -> Payment:
+        amount = self._act_total(rows.list_for_act(act.id))
+        if amount <= 0:
+            raise ValidationError("Act payment amount must be positive.")
+        return payments.create(
+            contract=act.contract,
+            user=current_user,
+            date=act.date,
+            amount=amount,
+            comments=self._payment_comment(act.number),
+        )
 
     def _act_total(self, rows: list[ActMedService]) -> Decimal:
         total = Decimal("0")

@@ -13,6 +13,7 @@ from app.services import ReportService
 from app.services.exceptions import DomainError
 from app.ui.contract_details_page import ContractDetailsPage
 from app.ui.contracts_page import ContractsPage
+from app.ui.help_dialog import HelpDialog
 from app.ui.med_services_page import MedServicesPage
 from app.ui.icons import (
     ICON_ABOUT,
@@ -159,6 +160,11 @@ class MainWindow(QMainWindow):
         reports_menu.addAction(services_matrix_report_action)
 
         help_menu = self.menuBar().addMenu("Помощь")
+        help_action = QAction(icon_for(ICON_ABOUT), "Справка", self)
+        help_action.setShortcut("F1")
+        help_action.triggered.connect(self._show_help)
+        help_menu.addAction(help_action)
+        help_menu.addSeparator()
         about_action = QAction(icon_for(ICON_ABOUT), "О программе", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
@@ -231,6 +237,10 @@ class MainWindow(QMainWindow):
                 f"База данных: {settings.database_path}"
             ),
         )
+
+    def _show_help(self) -> None:
+        dialog = HelpDialog(self)
+        dialog.exec_()
 
     def _render_services_report(self) -> None:
         dialog = ReportPeriodDialog("Отчет по услугам за период", self)

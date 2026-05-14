@@ -62,7 +62,7 @@ class PaymentService:
 
     def list_payments(self, contract_id: int) -> list[Payment]:
         with session_scope() as session:
-            return PaymentRepository(session).list_for_contract(contract_id)
+            return PaymentRepository(session).list_for_contract(contract_id, include_deleted=True)
 
     def _create(self, contract_id: int, data: dict, amount: Decimal, current_user: User) -> Payment:
         with session_scope() as session:
